@@ -7,7 +7,7 @@ import traci.constants as T # https://sumo.dlr.de/pydoc/traci.constants.html
 from traci.exceptions import FatalTraCIError, TraCIException
 import bisect
 import warnings
-import gym
+import gymnasium
 
 from u import *
 from ut import *
@@ -222,13 +222,15 @@ class NetBuilder:
         nodes = [E('node', **n.setdefaults(id=f'n_{n.x}.{n.y}')) for n in node_infos]
         self.nodes.update((n.id, n) for n in nodes)
         ret = np.empty(len(nodes), dtype=object)
-        ret[:] = nodes
+        #ret[:] = nodes
+        for i in range(len(nodes)):
+            ret[i] = nodes[i]
         return ret
 
     def chain(self, nodes, lane_maps=None, edge_attrs={}, route_id=None):
         edge_attrs = [edge_attrs] * (len(nodes) - 1) if isinstance(edge_attrs, dict) else edge_attrs
         lane_maps = lane_maps or [{0: 0} for _ in range(len(nodes) - 2)]
-        num_lanes = ([len(l) for l in lane_maps] + [len(set(lane_maps[-1].values()))])
+        num_lanes = ([len(l) for l in lane_maps] + [len(set(lane_maps[-1].values()))]) 
         edges = [E('edge', **{
             'id': f'e_{n1.id}_{n2.id}',
             'from': n1.id, 'to': n2.id,
@@ -260,7 +262,7 @@ class SumoDef:
 
     def __init__(self, c):
         self.c = c
-        self.dir = c.res.rel() / 'sumo'
+        self.dir = c.res.rel() / 'sumo' 
         if 'i_worker' in c:
             self.dir /= c.i_worker
         self.dir.mk() # Use relative path here to shorten sumo arguments
@@ -996,7 +998,7 @@ class Env:
         try: traci.close()
         except: pass
 
-class NormEnv(gym.Env):
+class NormEnv(gymnasium.Env):
     def __init__(self, c, env):
         self.c = c.setdefaults(norm_obs=False, norm_reward=False, center_reward=False, reward_clip=np.inf, obs_clip=np.inf)
         self.env = env
