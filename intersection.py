@@ -13,7 +13,7 @@ class GridEnv(Env):
         default_flows = lambda flow_id, route_id, flow_rate: [E('flow', **params) for params in [
             FLOW(f'{flow_id}', type='generic', route=route_id, departSpeed=c.depart_speed, vehsPerHour=flow_rate),
         ] if params.get('vehsPerHour')]
-
+        
         builder = NetBuilder()
         xys = np.array(np.ones((c.n_rows + 2, c.n_cols + 2)).nonzero()).T * c.length
         nodes = builder.add_nodes(
@@ -28,6 +28,7 @@ class GridEnv(Env):
 
         flows = []
         c.setdefaults(flow_rate_h=c.flow_rate, flow_rate_v=c.flow_rate)
+        c.log(f'Horizontal flow rate: {c.flow_rate_h}, vertical flow rate: {c.flow_rate_v}')
         priority = ['left', 'right'] if c.get('priority', 'vertical') == 'horizontal' else ['up', 'down']
         for direction in c.directions:
             chains = nodes if direction in ['left', 'right'] else nodes.T
@@ -260,7 +261,7 @@ class GridExp(Main):
         return rollout
 
 if __name__ == '__main__':
-    c = GridExp.from_args(globals(), locals())
+    c = GridExp.from_args(globals(), locals()) # Initialize configuration 
     c.setdefaults(
         n_steps=200,
         step_save=5,
@@ -281,7 +282,8 @@ if __name__ == '__main__':
 
         warmup_steps=100,
         horizon=2000,
-        directions=['up', 'right'],
+        #directions=['up', 'right'],
+        directions='4way',
         av_frac=0.15,
         flow_rate=700,
         length=100,
