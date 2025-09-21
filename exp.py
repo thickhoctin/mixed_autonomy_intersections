@@ -169,7 +169,8 @@ class Main(Config):
         """ Collect a list of rollouts for the training step """
         if c.use_ray:
             import ray
-            weights_id = ray.put({k: v.cpu() for k, v in c._model.state_dict().items()})
+            # Changed to .cpu() to .gpu() for Ray with GPU
+            weights_id = ray.put({k: v.cuda() for k, v in c._model.state_dict().items()})
             [w.set_weights.remote(weights_id) for w in c._rollout_workers]
             rollout_stats = flatten(ray.get([w.rollouts_single_process.remote() for w in c._rollout_workers]))
         else:
@@ -282,6 +283,7 @@ class Main(Config):
             c._env.close()
 
     def train(c):
+        
         c.on_train_start()
         while c._i < c.n_steps:
             c.on_step_start()
@@ -335,22 +337,36 @@ class Main(Config):
             c.n_workers = 1
             c.setdefaults(use_ray=False, n_rollouts_per_worker=c.n_rollouts_per_step // c.n_workers)
             c.eval()
-        else:
+        elif torch.cuda.device_count() > 0 and not c.get('use_ray', False): 
             c.setdefaults(device='cuda' if torch.cuda.is_available() else 'cpu')
+            if c.device == 'cuda':
+                c.n_rollouts_per_worker = c.n_rollouts_per_step // c.n_workers
+                worker_kwargs = c.get('worker_kwargs') or [{}] * c.n_workers
+                for i in range(len(worker_kwargs)):
+                    c.setdefaults(n_workers=c.n_rollouts_per_step, flow_rate_h=worker_kwargs[i].get('flow_rate_h', c.flow_rate), 
+                                  flow_rate_v=worker_kwargs[i].get('flow_rate_v', c.flow_rate))
+                    c.train()
+        else:            
             if c.get('use_ray', True) and c.n_rollouts_per_step > 1 and c.get('n_workers', np.inf) > 1:
+                n_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
                 c.setdefaults(n_workers=c.n_rollouts_per_step, use_ray=True)
                 c.n_rollouts_per_worker = c.n_rollouts_per_step // c.n_workers
                 import ray
                 try:
-                    ray.init(num_cpus=c.n_workers, include_dashboard=False)
+                    ray.init(num_cpus=c.n_workers, num_gpus=n_gpus, include_dashboard=False)
                 except:
-                    ray.init(num_cpus=c.n_workers, include_dashboard=False, _temp_dir=(Main.code_root/ 'tmp')._real)
-                RemoteMain = ray.remote(type(c))
+                    ray.init(num_cpus=c.n_workers, num_gpus=1, include_dashboard=False, _temp_dir=(Main.code_root/ 'tmp')._real)
                 worker_kwargs = c.get('worker_kwargs') or [{}] * c.n_workers
-                assert len(worker_kwargs) == c.n_workers
-                worker_kwargs = [{**c, 'main': False, 'device': 'cpu', **args} for args in worker_kwargs]
+                #assert len(worker_kwargs) == c.n_workers
+                if c.get('device') == 'cpu':
+                    RemoteMain = ray.remote(type(c)) 
+                    worker_kwargs = [{**c, 'main': False, 'device': 'cpu', **args} for args in worker_kwargs]
+                else:
+                    RemoteMain = ray.remote(num_gpus= 1)(type(c))
+                    worker_kwargs = [{**c, 'main': False, 'device': 'cuda', **args} for args in worker_kwargs]
                 c._rollout_workers = [RemoteMain.remote(**kwargs, i_worker=i) for i, kwargs in enumerate(worker_kwargs)]
                 ray.get([w.on_rollout_worker_start.remote() for w in c._rollout_workers])
+                
             else:
                 c.setdefaults(n_workers=1, n_rollouts_per_worker=c.n_rollouts_per_step, use_ray=False)
             assert c.n_workers * c.n_rollouts_per_worker == c.n_rollouts_per_step
