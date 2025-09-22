@@ -285,6 +285,7 @@ class Main(Config):
     def train(c):
         
         c.on_train_start()
+        c._i = 0
         while c._i < c.n_steps:
             c.on_step_start()
             with torch.no_grad():
@@ -343,8 +344,10 @@ class Main(Config):
                 c.n_rollouts_per_worker = c.n_rollouts_per_step // c.n_workers
                 worker_kwargs = c.get('worker_kwargs') or [{}] * c.n_workers
                 for i in range(len(worker_kwargs)):
-                    c.setdefaults(n_workers=c.n_rollouts_per_step, flow_rate_h=worker_kwargs[i].get('flow_rate_h', c.flow_rate), 
-                                  flow_rate_v=worker_kwargs[i].get('flow_rate_v', c.flow_rate))
+                    c.setdefaults(n_workers=c.n_rollouts_per_step, flow_rate_h=worker_kwargs[i].get('flow_rate_h', c.flow_rate), flow_rate_v=worker_kwargs[i].get('flow_rate_v', c.flow_rate))               
+                    if c.flow_rate_h is not None and c.flow_rate_v is not None:
+                        c.__setattr__('flow_rate_h', worker_kwargs[i].get('flow_rate_h', c.flow_rate))
+                        c.__setattr__('flow_rate_v', worker_kwargs[i].get('flow_rate_v', c.flow_rate))
                     c.train()
         else:            
             if c.get('use_ray', True) and c.n_rollouts_per_step > 1 and c.get('n_workers', np.inf) > 1:
