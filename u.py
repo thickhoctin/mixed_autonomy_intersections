@@ -275,15 +275,30 @@ class Path(str):
         return self.ls(show_hidden=show_hidden, file_only=True)
 
     def lslinks(self, show_hidden=True, exist=None):
+        '''
+        Description: Lists symbolic links in the directory, optionally filtering by existence.
+        @param show_hidden: Whether to include hidden files/dirs.
+        @param exist: If set, filter by whether the link exists.
+        @return: List of Path objects that are symlinks.
+        '''
         dirs, files = self.ls(show_hidden=show_hidden)
         return [x for x in dirs + files if x.islink() and (
             exist is None or not (exist ^ x.exists()))]
 
     def glob(self, glob_str):
+        '''
+        Description: Returns a list of Paths matching a glob pattern.
+        @param glob_str: Glob pattern string.
+        @return: List of Path objects.
+        '''
         return [Path(p) for p in glob(self / glob_str, recursive=True)]
 
     def re(self, re_pattern):
-        """ Similar to .glob but uses regex pattern """
+        '''
+        Description: Returns a list of Paths matching a regex pattern (directory tree).
+        @param re_pattern: Regex pattern string (split by '/').
+        @return: List of Path objects.
+        '''
         subpatterns = lmap(re.compile, re_pattern.split('/'))
         matches = []
         dirs, files = self.ls()
@@ -297,7 +312,12 @@ class Path(str):
         return sorted(filter(lambda x: subpatterns[-1].fullmatch(x._name), dirs + files))
 
     def recurse(self, dir_fn=None, file_fn=None):
-        """ Recursively apply dir_fn and file_fn to all subdirs and files in directory """
+        '''
+        Description: Recursively applies functions to all subdirs and files in directory.
+        @param dir_fn: Function to apply to directories.
+        @param file_fn: Function to apply to files.
+        @return: None
+        '''
         if dir_fn is not None:
             dir_fn(self)
         dirs, files = self.ls()
@@ -307,14 +327,26 @@ class Path(str):
             dir.recurse(dir_fn=dir_fn, file_fn=file_fn)
 
     def mk(self):
+        '''
+        Description: Creates the directory (including parents).
+        @return: Self (Path object).
+        '''
         os.makedirs(self, exist_ok=True)
         return self
 
     def dir_mk(self):
+        '''
+        Description: Creates the parent directory of this path.
+        @return: Self (Path object).
+        '''
         self._up.mk()
         return self
 
     def rm(self):
+        '''
+        Description: Removes the file or directory at this path.
+        @return: Self (Path object).
+        '''
         if self.isfile() or self.islink():
             os.remove(self)
         elif self.isdir():
@@ -322,23 +354,53 @@ class Path(str):
         return self
 
     def unlink(self):
+        '''
+        Description: Removes a symbolic link.
+        @return: Self (Path object).
+        '''
         os.unlink(self)
         return self
 
 
     def mv(self, dest):
+        '''
+        Description: Moves this file or directory to a new destination.
+        @param dest: Destination path.
+        @return: None
+        '''
         shutil.move(self, dest)
 
     def mv_from(self, src):
+        '''
+        Description: Moves a file or directory from src to this path.
+        @param src: Source path.
+        @return: None
+        '''
         shutil.move(src, self)
 
     def cp(self, dest):
+        '''
+        Description: Copies this file to a new destination.
+        @param dest: Destination path.
+        @return: None
+        '''
         shutil.copy(self, dest)
 
     def cp_from(self, src):
+        '''
+        Description: Copies a file from src to this path.
+        @param src: Source path.
+        @return: None
+        '''
         shutil.copy(src, self)
 
     def link(self, target, force=False):
+        '''
+        Description: Creates a symbolic link at this path to the target.
+        @param target: Target path.
+        @param force: If True, overwrite existing link.
+        @return: None
+        '''
         if self.lexists():
             if not force:
                 return
@@ -347,27 +409,60 @@ class Path(str):
         os.symlink(target, self)
 
     def exists(self):
+        '''
+        Description: Checks if the path exists.
+        @return: True if exists, else False.
+        '''
         return os.path.exists(self)
 
     def lexists(self):
+        '''
+        Description: Checks if the path exists (including broken symlinks).
+        @return: True if exists, else False.
+        '''
         return os.path.lexists(self)
 
     def isfile(self):
+        '''
+        Description: Checks if the path is a file.
+        @return: True if file, else False.
+        '''
         return os.path.isfile(self)
 
     def isdir(self):
+        '''
+        Description: Checks if the path is a directory.
+        @return: True if directory, else False.
+        '''
         return os.path.isdir(self)
 
     def islink(self):
+        '''
+        Description: Checks if the path is a symbolic link.
+        @return: True if symlink, else False.
+        '''
         return os.path.islink(self)
 
     def chdir(self):
+        '''
+        Description: Changes the current working directory to this path.
+        @return: None
+        '''
         os.chdir(self)
 
     def rel(self, start=None):
+        '''
+        Description: Returns the relative path from start to this path.
+        @param start: Start path (optional).
+        @return: Path object (relative path).
+        '''
         return Path(os.path.relpath(self, start=start))
 
     def clone(self):
+        '''
+        Description: Returns a new Path with an incremented suffix if the path exists.
+        @return: New Path object.
+        '''
         name = self._name
         match = re.search('__([0-9]+)$', name)
         if match is None:
@@ -385,14 +480,26 @@ class Path(str):
 
     @property
     def _(self):
+        '''
+        Description: Returns the string representation of the path.
+        @return: String path.
+        '''
         return str(self)
 
     @property
     def _real(self):
+        '''
+        Description: Returns the absolute, expanded path.
+        @return: Path object (absolute path).
+        '''
         return Path(os.path.realpath(os.path.expanduser(self)))
 
     @property
     def _up(self):
+        '''
+        Description: Returns the parent directory as a Path.
+        @return: Path object (parent directory).
+        '''
         path = os.path.dirname(self.rstrip('/'))
         if path == '':
             path = os.path.dirname(self._real.rstrip('/'))
@@ -400,14 +507,26 @@ class Path(str):
 
     @property
     def _name(self):
+        '''
+        Description: Returns the base name of the path.
+        @return: Path object (base name).
+        '''
         return Path(os.path.basename(self))
 
     @property
     def _stem(self):
+        '''
+        Description: Returns the stem (filename without extension).
+        @return: Path object (stem).
+        '''
         return Path(os.path.splitext(self)[0])
 
     @property
     def _basestem(self):
+        '''
+        Description: Returns the base stem (recursively removes extensions).
+        @return: Path object (base stem).
+        '''
         new = self._stem
         while new != self:
             new, self = new._stem, new
@@ -415,6 +534,10 @@ class Path(str):
 
     @property
     def _ext(self):
+        '''
+        Description: Returns the file extension.
+        @return: Path object (extension).
+        '''
         return Path(os.path.splitext(self)[1])
 
     extract = extract
@@ -426,63 +549,137 @@ class Path(str):
     save_p = save_pickle
 
     def save_bytes(self, bytes):
+        '''
+        Description: Saves bytes to this file.
+        @param bytes: Bytes to write.
+        @return: None
+        '''
         with open(self, 'wb') as f:
             f.write(bytes)
 
     def load_csv(self, index_col=0, **kwargs):
+        '''
+        Description: Loads a CSV file into a pandas DataFrame.
+        @param index_col: Index column for DataFrame.
+        @param **kwargs: Additional pandas read_csv arguments.
+        @return: pandas DataFrame.
+        '''
         return pd.read_csv(self, index_col=index_col, **kwargs)
 
     def save_csv(self, df, float_format='%.5g', **kwargs):
+        '''
+        Description: Saves a pandas DataFrame to a CSV file.
+        @param df: DataFrame to save.
+        @param float_format: Float format string.
+        @param **kwargs: Additional pandas to_csv arguments.
+        @return: None
+        '''
         df.to_csv(self, float_format=float_format, **kwargs)
 
     def load_npy(self):
+        '''
+        Description: Loads a numpy array from a .npy file.
+        @return: numpy array.
+        '''
         return np.load(self, allow_pickle=True)
 
     def save_npy(self, obj):
+        '''
+        Description: Saves a numpy array to a .npy file.
+        @param obj: numpy array to save.
+        @return: None
+        '''
         np.save(self, obj)
 
     def load_yaml(self):
+        '''
+        Description: Loads a YAML file and returns the parsed object.
+        @return: Parsed YAML object.
+        '''
         with open(self, 'r') as f:
             return yaml.safe_load(f)
 
     def save_yaml(self, obj):
+        '''
+        Description: Saves an object as YAML to this file.
+        @param obj: Object to save.
+        @return: None
+        '''
         obj = recurse(obj, lambda x: x._ if isinstance(x, Path) else dict(x) if isinstance(x, Dict) else x)
         with open(self, 'w') as f:
             yaml.dump(obj, f, default_flow_style=False, allow_unicode=True)
 
     def load_pth(self):
+        '''
+        Description: Loads a PyTorch model from a .pth file.
+        @return: Loaded PyTorch object.
+        '''
         return torch.load(self)
 
     def save_pth(self, obj):
+        '''
+        Description: Saves a PyTorch object to a .pth file.
+        @param obj: PyTorch object to save.
+        @return: None
+        '''
         torch.save(obj, self)
 
     def load_pdf(self):
-        """
-        return: PdfReader object.
+        '''
+        Description: Loads a PDF file and returns a PdfReader object.
+        @return: PdfReader object.
         Can use index and slice obj.pages for the pages, then call Path.save_pdf to save
-        """
+        '''
         from pdfrw import PdfReader
         return PdfReader(self)
 
     def save_pdf(self, pages):
+        '''
+        Description: Saves PDF pages to this file.
+        @param pages: PDF pages to save.
+        @return: None
+        '''
         from pdfrw import PdfWriter
         writer = PdfWriter()
         writer.addpages(pages)
         writer.write(self)
 
     def load(self):
+        '''
+        Description: Loads an object from this file, inferring the format from the extension.
+        @return: Loaded object.
+        '''
         return eval('self.load_%s' % self._ext[1:])()
 
     def save(self, obj):
+        '''
+        Description: Saves an object to this file, inferring the format from the extension.
+        @param obj: Object to save.
+        @return: None
+        '''
         return eval('self.save_%s' % self._ext[1:])(obj)
 
     def replace_txt(self, replacements, dst=None):
+        '''
+        Description: Replaces text in the file according to a replacements dict and saves.
+        @param replacements: Dict of {old: new} replacements.
+        @param dst: Destination path (optional).
+        @return: None
+        '''
         content = self.load_txt()
         for k, v in replacements.items():
             content = content.replace(k, v)
         (dst or self).save_txt(content)
 
     def update_dict(self, updates={}, vars=[], unvars=[], dst=None):
+        '''
+        Description: Updates a dict stored in this file, optionally setting/unsetting keys, and saves.
+        @param updates: Dict of updates.
+        @param vars: List of keys to set True.
+        @param unvars: List of keys to remove.
+        @param dst: Destination path (optional).
+        @return: None
+        '''
         d = self.load()
         for k in vars:
             d[k] = True
@@ -492,36 +689,89 @@ class Path(str):
         (dst or self).save(d)
 
     def torch_strip(self, dst):
+        '''
+        Description: Removes 'opt' and 'step' keys from a torch checkpoint dict and saves.
+        @param dst: Destination path.
+        @return: None
+        '''
         self.update_dict(unvars=['opt', 'step'], dst=dst)
 
     def wget(self, link):
+        '''
+        Description: Downloads a file to this directory using wget.
+        @param link: URL to download.
+        @return: Path to downloaded file.
+        '''
         if self.isdir():
             return Path(wget(link, self))
         raise ValueError('Path %s needs to be a directory' % self)
 
     def replace(self, old, new=''):
+        '''
+        Description: Returns a new Path with replaced substring.
+        @param old: Substring to replace.
+        @param new: Replacement string.
+        @return: New Path object.
+        '''
         return Path(super().replace(old, new))
 
     def search(self, pattern):
+        '''
+        Description: Searches for a regex pattern in the path string.
+        @param pattern: Regex pattern.
+        @return: Match object or None.
+        '''
         return re.search(pattern, self)
 
     def search_pattern(self, pattern):
+        '''
+        Description: Returns the first matching group for a regex pattern in the path string.
+        @param pattern: Regex pattern.
+        @return: String of the first match.
+        '''
         return self.search(pattern).group()
 
     def search_groups(self, pattern):
+        '''
+        Description: Returns all matching groups for a regex pattern in the path string.
+        @param pattern: Regex pattern.
+        @return: Tuple of matching groups.
+        '''
         return self.search(pattern).groups()
 
     def search_group(self, pattern):
+        '''
+        Description: Returns the first group for a regex pattern in the path string.
+        @param pattern: Regex pattern.
+        @return: String of the first group.
+        '''
         return self.search_groups(pattern)[0]
 
     def findall(self, pattern):
+        '''
+        Description: Finds all non-overlapping matches of a regex pattern in the path string.
+        @param pattern: Regex pattern.
+        @return: List of matches.
+        '''
         return re.findall(pattern, self)
 
 class Namespace(Dict):
     def __init__(self, *args, **kwargs):
+        '''
+        Description: Initializes the Namespace with given variables.
+        @param *args: Positional arguments (str or dict).
+        @param **kwargs: Keyword arguments.
+        @return: None
+        '''
         self.var(*args, **kwargs)
 
     def var(self, *args, **kwargs):
+        '''
+        Description: Sets variables in the Namespace from args and kwargs.
+        @param *args: Strings (set True) or dicts (update).
+        @param **kwargs: Key-value pairs to set.
+        @return: Self (Namespace).
+        '''
         kvs = Dict()
         for a in args:
             if isinstance(a, str):
@@ -533,11 +783,22 @@ class Namespace(Dict):
         return self
 
     def unvar(self, *args):
+        '''
+        Description: Removes variables from the Namespace.
+        @param *args: Keys to remove.
+        @return: Self (Namespace).
+        '''
         for a in args:
             self.pop(a)
         return self
 
     def setdefaults(self, *args, **kwargs):
+        '''
+        Description: Sets default values for keys not already in the Namespace.
+        @param *args: Keys to set True if not present.
+        @param **kwargs: Key-value pairs to set if not present.
+        @return: Self (Namespace).
+        '''
         args = [a for a in args if a not in self]
         kwargs = {k: v for k, v in kwargs.items() if k not in self}
         return self.var(*args, **kwargs)
@@ -584,9 +845,21 @@ arrayb = lambda *args, **kwargs: np.array(*args, **kwargs, dtype=np.bool)
 arrayo = lambda *args, **kwargs: np.array(*args, **kwargs, dtype=object)
 
 def split(x, sizes):
+    '''
+    Description: Splits an array into sections with given sizes.
+    @param x: Array to split.
+    @param sizes: List of sizes for each split.
+    @return: List of arrays.
+    '''
     return np.split(x, np.cumsum(sizes[:-1]))
 
 def recurse(x, fn):
+    '''
+    Description: Recursively applies a function to all elements in a nested structure.
+    @param x: Input (dict, list, tuple, or value).
+    @param fn: Function to apply.
+    @return: Structure with function applied to all leaves.
+    '''
     if isinstance(x, dict):
         return type(x)((k, recurse(v, fn)) for k, v in x.items())
     elif isinstance(x, (list, tuple)):
@@ -594,6 +867,11 @@ def recurse(x, fn):
     return fn(x)
 
 def from_numpy(x):
+    '''
+    Description: Converts numpy arrays to native Python types recursively.
+    @param x: Numpy array or nested structure.
+    @return: Structure with numpy arrays converted to lists/scalars.
+    '''
     def helper(x):
         if type(x).__module__ == np.__name__:
             if isinstance(x, np.ndarray):
@@ -603,27 +881,61 @@ def from_numpy(x):
     return recurse(x, helper)
 
 def smooth(y, box_pts):
+    '''
+    Description: Smooths a 1D array using a moving average.
+    @param y: Input array.
+    @param box_pts: Window size.
+    @return: Smoothed array.
+    '''
     box = np.ones(box_pts) / box_pts
     y_smooth = np.convolve(y, box, mode='same')
     return y_smooth
 
 def gsmooth(y, sigma):
+    '''
+    Description: Smooths a 1D array using a Gaussian filter.
+    @param y: Input array.
+    @param sigma: Standard deviation for Gaussian kernel.
+    @return: Smoothed array.
+    '''
     from scipy.ndimage.filters import gaussian_filter1d
     return gaussian_filter1d(y, sigma=sigma)
 
 def normalize(x, eps=1e-8):
+    '''
+    Description: Normalizes an array to zero mean and unit variance.
+    @param x: Input array.
+    @param eps: Small value to avoid division by zero.
+    @return: Normalized array.
+    '''
     return (x - x.mean()) / x.std()
 
 def inverse_map(arr):
+    '''
+    Description: Returns the inverse mapping of an array of indices.
+    @param arr: Array of indices.
+    @return: Inverse mapping array.
+    '''
     inv_map = np.zeros(len(arr))
     inv_map[arr] = np.arange(len(arr))
     return inv_map
 
 def pad_arrays(arrs, value):
+    '''
+    Description: Pads arrays to the same length with a given value.
+    @param arrs: List of arrays.
+    @param value: Padding value.
+    @return: 2D numpy array.
+    '''
     max_len = max(len(x) for x in arrs)
     return np.array([np.concatenate([x, np.full(max_len - len(x), value)]) for x in arrs])
 
 def sorted_segment_maps(segments):
+    '''
+    Description: Computes sorted segment indices and related mappings.
+    @param segments: Array of segment lengths.
+    @return: Namespace with segment mappings and indices.
+    '''
     r = Namespace()
     r.segment_idxs = np.argsort(segments)
     starts = np.cumsum(segments) - segments
@@ -636,6 +948,11 @@ def sorted_segment_maps(segments):
     return r
 
 def get_gpu_info(ssh_fn=lambda x: x):
+    '''
+    Description: Gets GPU memory and utilization info using nvidia-smi.
+    @param ssh_fn: Function to run shell command (default: identity).
+    @return: DataFrame with GPU info.
+    '''
     nvidia_str, _ = shell(ssh_fn('nvidia-smi --query-gpu=index,name,memory.used,memory.total,utilization.gpu --format=csv,nounits'))
     nvidia_str = nvidia_str.replace('[Not Supported]', '100').replace(', ', ',')
     nvidia_str_io = StringIO(nvidia_str)
@@ -656,6 +973,12 @@ def get_gpu_info(ssh_fn=lambda x: x):
     return out_df
 
 def get_process_gpu_info(pid=None, ssh_fn=lambda x: x):
+    '''
+    Description: Gets GPU info for a specific process using nvidia-smi.
+    @param pid: Process ID (default: None for all, -1 for current process).
+    @param ssh_fn: Function to run shell command (default: identity).
+    @return: DataFrame or Series with GPU info for the process.
+    '''
     nvidia_str, _ = shell(ssh_fn('nvidia-smi --query-compute-apps=pid,gpu_name,used_gpu_memory --format=csv,nounits'))
     nvidia_str_io = StringIO(nvidia_str.replace(', ', ','))
 
