@@ -1229,7 +1229,7 @@ class Config(Namespace):
 
     @property
     def models(self):
-        return (self.res / 'models').mk()
+        return (self.res /'models'/f'flow_{self.flow_rate_h}x{self.flow_rate_v}').mk() # add flow rate to path
 
     def model_save(self, step):
         return self.models / ('model-%s.pth' % step)
