@@ -201,34 +201,48 @@ class GridEnv(Env):
                 lanes_by_direction = {}
 
                 for jun_lane in lane.next_junction_lanes:
-                    # Defaults for jun_lane
-                    jun_headtails = vehs_default()
-                    
                     jun_lane_route = nexti(jun_lane.from_routes)
-                    jun_veh, _ = jun_lane.prev_vehicle(0, route=jun_lane_route)
-                    jun_veh = jun_veh if jun_veh and jun_veh.lane.next_junction is junction else None
+                    lane_direction = None
+                    for direction in c.directions:
+                        if direction in jun_lane_route.id:
+                            lane_direction = direction
+                            break
+                    
+                    # Keep the lane for each direction
+                    if lane_direction and lane_direction not in lanes_by_direction:
+                        lanes_by_direction[lane_direction] = jun_lane
+                        if len(lanes_by_direction) >= max_cross_directions:
+                            break
+                for direction in c.directions:
+                    if direction in lanes_by_direction:          
+                    # Defaults for jun_lane
+                        jun_headtails = vehs_default()
+                        jun_lane = lanes_by_direction[direction]
+                        jun_lane_route = nexti(jun_lane.from_routes)
+                        jun_veh, _ = jun_lane.prev_vehicle(0, route=jun_lane_route)
+                        jun_veh = jun_veh if jun_veh and jun_veh.lane.next_junction is junction else None
 
-                    if jun_veh:
-                        if jun_veh.type is rl_type:
-                            # If jun_veh is RL or jun_veh is human and there's no RL vehicle in front of it
-                            jun_headtails[1: 3] = jun_veh, jun_veh.platoon.tail
-                            platoon = jun_veh.platoon.prev
-                            for i in 1 + 2 * np.arange(1, c.obs_next_cross_platoons):
-                                if platoon is None: break
-                                jun_headtails[i: i + 2] = platoon.head, platoon.tail
-                                platoon = platoon.prev
-                        else:
-                            # If jun_veh is a human vehicle behind some RL vehicle (in another lane)
-                            jun_headtails[0] = jun_veh.platoon.tail
-                            next_cross_platoon = jun_veh.platoon.prev
-                            if next_cross_platoon:
-                                jun_headtails[1: 3] = next_cross_platoon.head, next_cross_platoon.tail
-                                platoon = next_cross_platoon.prev
+                        if jun_veh:
+                            if jun_veh.type is rl_type:
+                                # If jun_veh is RL or jun_veh is human and there's no RL vehicle in front of it
+                                jun_headtails[1: 3] = jun_veh, jun_veh.platoon.tail
+                                platoon = jun_veh.platoon.prev
                                 for i in 1 + 2 * np.arange(1, c.obs_next_cross_platoons):
                                     if platoon is None: break
                                     jun_headtails[i: i + 2] = platoon.head, platoon.tail
                                     platoon = platoon.prev
-                    route_vehs.append((jun_lane_route, jun_headtails))
+                            else:
+                                # If jun_veh is a human vehicle behind some RL vehicle (in another lane)
+                                jun_headtails[0] = jun_veh.platoon.tail
+                                next_cross_platoon = jun_veh.platoon.prev
+                                if next_cross_platoon:
+                                    jun_headtails[1: 3] = next_cross_platoon.head, next_cross_platoon.tail
+                                    platoon = next_cross_platoon.prev
+                                    for i in 1 + 2 * np.arange(1, c.obs_next_cross_platoons):
+                                        if platoon is None: break
+                                        jun_headtails[i: i + 2] = platoon.head, platoon.tail
+                                        platoon = platoon.prev
+                        route_vehs.append((jun_lane_route, jun_headtails))
 
             dist_features, speed_features = [], []
             for route, vehs in route_vehs:
