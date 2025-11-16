@@ -728,11 +728,13 @@ class TrafficState:
             # Check if route is a distribution or single route
             if e_flow.route in self.route_distribution: # Route distribution case
                 dist = self.route_distribution[e_flow.route]
+                flow.route_distribution = dist
                 flow.route =  dist.routes[0]
                 flow.edge = dist.routes[0].edges[0]
             else: # Single route case
                 flow.route = route = self.routes[e_flow.route]
                 flow.edge = route.edges[0]
+                flow.route_distribution = None
             flow.type = self.types.get(e_flow.type)
             flow.backlog = set() # IDs of backlogged vehicles for this inflow
             # For generic_type only
