@@ -248,6 +248,16 @@ class NetBuilder:
         self.additional.append(route)
         return edges, connections, route
 
+    def chain_leftright(self, nodes, lane_maps=None, edge_attrs={}, route_id=None):
+        connection = []
+        route = []
+        edge_attrs = [edge_attrs] * (len(nodes) - 1) if isinstance(edge_attrs, dict) else edge_attrs
+        lane_maps = lane_maps or [{0: 0} for _ in range(len(nodes) - 2)]
+        num_lanes = ([len(l) for l in lane_maps] + [len(set(lane_maps[-1].values()))]) 
+        
+
+        return connection, routes
+
     def build(self):
         return E('nodes', *self.nodes.values()), E('edges', *self.edges.values()), E('connections', *self.connections.values()), self.additional
 
