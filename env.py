@@ -247,16 +247,34 @@ class NetBuilder:
         self.connections.update(((con['from'], con.to, con.fromLane, con.toLane), con) for con in connections)
         self.additional.append(route)
         return edges, connections, route
-
-    def chain_leftright(self, nodes, lane_maps=None, edge_attrs={}, route_id=None):
-        connection = []
-        route = []
-        edge_attrs = [edge_attrs] * (len(nodes) - 1) if isinstance(edge_attrs, dict) else edge_attrs
-        lane_maps = lane_maps or [{0: 0} for _ in range(len(nodes) - 2)]
-        num_lanes = ([len(l) for l in lane_maps] + [len(set(lane_maps[-1].values()))]) 
-        
-
-        return connection, routes
+    
+    # add chain left right to create turning lanes
+    def chain_leftright(self, edges, edge_attrs={}, route_id=None, lane_maps=None):
+        if route_id is None:
+            r_id = 0
+        else:
+            r_id = route_id
+        routes = []
+        connected_pairs = []
+        # check if edges are connected
+        for edge1 in edges:
+            for edge2 in edges:
+                if (edge1['to'] == edge2['from']) and edge1['from'] != edge2['to']:
+                    connected_pairs.append((edge1, edge2))
+        lane_maps = lane_maps or [{0: 0} for _ in range(len(connected_pairs))]
+        connections = flatten([[E('connection', **{
+            'from': e1.id, 'to': e2.id,
+            'fromLane': from_, 'toLane': to
+        }) for from_, to in lmap.items()] for (e1, e2), lmap in zip(connected_pairs, lane_maps)])
+        for con in connections:
+            con_key = (con['from'], con.to, con.fromLane, con.toLane)
+            if con_key not in self.connections.keys():
+                self.connections.update({con_key: con})
+                route = E('route', id=f'r_turn_{r_id}' or f'r_{len(self.additional)}', edges=f'{con_key[0]} {con_key[1]}')
+                routes.append(route)
+                r_id += 1
+        self.additional.extend(routes)
+        return connections, routes
 
     def build(self):
         return E('nodes', *self.nodes.values()), E('edges', *self.edges.values()), E('connections', *self.connections.values()), self.additional
@@ -641,6 +659,13 @@ class TrafficState:
                 e2.from_routes.add(route)
                 for curr, next_ in zip(segment, segment[1:]):
                     route.next[curr] = next_
+                    # Check if internal edge
+                    if next_.tos:
+                        for to_lane in next_.tos:
+                            if(to_lane.id in self.internal_edges.keys()):
+                                to_lane.lanes[0].from_routes.add(route)
+                                to_lane.lanes[0].to_routes.add(route)
+                                route.edges.append(to_lane)
                     route.prev[next_] = curr
                     for curr_lane in curr.lanes:
                         curr_lane.to_routes.add(route)
@@ -649,15 +674,14 @@ class TrafficState:
                                 assert curr_lane in to_lane.froms
                                 route.next[curr_lane] = to_lane
                                 route.prev[to_lane] = curr_lane
-                                to_lane.from_routes.add(route)
+                                to_lane.from_routes.add(route)                                
                                 break
                 route.edges.extend(segment[1:])
 
             route.junctions = junctions, junction_positions = [], []
             offset = 0
             for edge in route.edges:
-                edge.route_position.setdefault(route, offset) # If already set, don't set again if same edge appears multiple times
-
+                edge.route_position.setdefault(route, offset) # If already set, don't set again if same edge appears multiple times                
                 lane = nexti(edge.lanes)
                 junction = lane.get('junction')
                 if junction:
@@ -665,6 +689,7 @@ class TrafficState:
                     junction_positions.append(offset)
                     junction.route_position[route] = offset
                 offset += edge.length
+                
 
             next_junction = self.sentinel_junction
             next_junction_lanes, next_cross_lanes = set(), set()
@@ -679,11 +704,35 @@ class TrafficState:
                     next_cross_lanes = lane.cross_lanes
                     next_junction_lanes = lane.junction_lanes
 
+        # Update code for routes distribution
+        self.route_distribution = Container()
+        for e_dist in map(values_str_to_val, add_children('routeDistribution')):
+            dist_routes = []
+            dist_probs = []
+            for e_route in e_dist:
+                route_id = e_route['refId']
+                prob = e_route.probability 
+                if route_id in self.routes:
+                    dist_routes.append(self.routes[route_id])
+                    dist_probs.append(prob)    
+            self.route_distribution[e_dist.id] = Namespace(
+                id = e_dist.id,
+                routes = dist_routes,
+                probabilities = dist_probs
+            )
+
         self.flows = flows = Container()
         for e_flow in map(values_str_to_val, add_children('flow')):
             flows[e_flow.id] = flow = Flow(**e_flow)
-            flow.route = route = self.routes[e_flow.route]
-            flow.edge = route.edges[0]
+            
+            # Check if route is a distribution or single route
+            if e_flow.route in self.route_distribution: # Route distribution case
+                dist = self.route_distribution[e_flow.route]
+                flow.route =  dist.routes[0]
+                flow.edge = dist.routes[0].edges[0]
+            else: # Single route case
+                flow.route = route = self.routes[e_flow.route]
+                flow.edge = route.edges[0]
             flow.type = self.types.get(e_flow.type)
             flow.backlog = set() # IDs of backlogged vehicles for this inflow
             # For generic_type only
