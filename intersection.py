@@ -25,7 +25,8 @@ class GridEnv(Env):
             c.av_frac = 0
             c.pop('av_range', None)
             c.speed_mode = SPEED_MODE.all_checks
-
+        # Store route by direction for route distribution
+        routes_by_dir = {direction: [] for direction in c.directions}
         flows = []
         c.setdefaults(flow_rate_h=c.flow_rate, flow_rate_v=c.flow_rate)
         c.log(f'Horizontal flow rate: {c.flow_rate_h}, vertical flow rate: {c.flow_rate_v}')
@@ -41,8 +42,42 @@ class GridEnv(Env):
 
             for i, chain in enumerate(chains[1:-1]):
                 route_id, flow_id = f'r_{direction}_{i}', f'f_{direction}_{i}'
-                builder.chain(chain, route_id=route_id, edge_attrs=edge_attrs)
+                _, _, route = builder.chain(chain, route_id=route_id, edge_attrs=edge_attrs)
+                routes_by_dir[direction].append(route)
                 flows.extend(default_flows(flow_id, route_id, flow_rate))
+
+        # Add turn routes if enabled
+        if c.chain_lr:
+            connections, turn_routes = builder.chain_leftright(builder.edges.values(), edge_attrs=edge_attrs)
+            # for i in range(len(turn_routesroutes)):
+            #     flow_id = f'f_turn_{i}'
+            #     flows.extend(default_flows(flow_id, turn_routes[i].id, flow_rate))
+            
+
+            for route in turn_routes:
+                edge_ids = route.edges.split(' ')
+                first_edge = edge_ids[0]
+
+                for direction in c.directions:
+                    if first_edge == routes_by_dir[direction][0].edges.split(' ')[0]:
+                        routes_by_dir[direction].append(route)
+                        #print(f'Added turn route {route.id} to direction {direction}')
+                        break
+            for direction, routes in routes_by_dir.items():
+                if not routes:
+                    continue
+                # Create route distribution
+                dist_id = f'dist_{direction}'
+                route_dist = E('routeDistribution', id=dist_id)
+                prob = 1.0 / len(routes)
+                for route in routes:
+                    route_dist.append(E('route', refId=route.id, probability=str(prob)))
+                builder.additional.append(route_dist)
+                for flow in flows:
+                    if direction in flow.id:
+                        flow.route = dist_id
+                
+
 
         tls = []
         if tl:
@@ -87,6 +122,7 @@ class GridEnv(Env):
             split_idxs = 1 + rl_idxs
 
             prev = None
+            # Assign platoons to vehicles
             for i, vehs_i in enumerate(np.split(vehs, split_idxs)):
                 if not len(vehs_i):
                     continue # Last vehicle is RL, so the last split is empty
@@ -160,10 +196,14 @@ class GridEnv(Env):
             if junction is ts.sentinel_junction:
                 route_vehs.extend([(None, vehs_default())] * (len(c.directions) - 1))
             else:
+                # Group crossing lane by direction
+                max_cross_directions = len(c.directions) - 1
+                lanes_by_direction = {}
+
                 for jun_lane in lane.next_junction_lanes:
                     # Defaults for jun_lane
                     jun_headtails = vehs_default()
-
+                    
                     jun_lane_route = nexti(jun_lane.from_routes)
                     jun_veh, _ = jun_lane.prev_vehicle(0, route=jun_lane_route)
                     jun_veh = jun_veh if jun_veh and jun_veh.lane.next_junction is junction else None
