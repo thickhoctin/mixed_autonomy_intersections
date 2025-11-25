@@ -1,5 +1,5 @@
 import scipy.signal
-from gym.spaces import Box, Discrete
+from gymnasium.spaces import Box, Discrete
 
 from u import *
 
@@ -25,21 +25,55 @@ class RunningStats:
     def __init__(self):
         self.n = 0
         self.mean = 0
-        self._nstd = 0
-
+        self._nstd = 0 # sum of squared differences from the mean
+    
     def update(self, x):
-        self.n += 1
-        if self.n == 1:
-            self.mean = x
+        # Update running mean and variance using Welford's algorithm
+        # Convert to flat numpy array
+        if isinstance(x, list):
+            if not x:
+                return
+            x = np.concatenate([np.atleast_1d(xi) for xi in x])
+        elif not isinstance(x, np.ndarray):
+            x = np.array([x])
+        
+        x = x.flatten().astype(np.float32)
+        if len(x) == 0:
+            return
+        
+        # Batch statistics
+        n_b = len(x)
+        mean_b = x.mean()
+        M2_b = ((x-mean_b)**2).sum()
+        if self.n == 0:
+            # First batch - initialize
+            self.n = n_b
+            self.mean = mean_b
+            self._nstd = M2_b
         else:
-            old_mean = self.mean
-            self.mean = old_mean + (x - old_mean) / self.n
-            self._nstd = self._nstd + (x - old_mean) * (x - self.mean)
+            # Combine with existing statistics
+            n_a = self.n 
+            mean_a = self.mean
+            M2_a = self._nstd
+
+            n_ab = n_a + n_b
+            delta = mean_b - mean_a
+
+            # Update mean
+            mean_ab = mean_a + delta * n_b / n_ab
+
+            # Update M2 (variance * n)
+            M2_ab = M2_a + M2_b + delta**2 * n_a * n_b / n_ab
+            self.n = n_ab
+            self.mean = mean_ab
+            self._nstd = M2_ab
     @property
     def var(self):
+        """Sample variance"""
         return self._nstd / (self.n - 1) if self.n > 1 else np.square(self.mean)
     @property
     def std(self):
+        """Sample standard deviation"""
         return np.sqrt(self.var)
 
 class NamedArrays(dict):
@@ -95,7 +129,7 @@ class NamedArrays(dict):
             if isinstance(v, NamedArrays):
                 v.to_torch(dtype, device)
             else:
-                if v.dtype == np.object:
+                if v.dtype == np.object_: # changed object to object_
                     self[k] = [torch.tensor(np.ascontiguousarray(x), device=device) for x in v]
                 else:
                     self[k] = torch.tensor(np.ascontiguousarray(v), device=device)
@@ -112,7 +146,7 @@ class NamedArrays(dict):
     def filter(self, *args):
         return type(self)((k, v) for k, v in self.items() if k in args)
 
-    def iter_minibatch(self, n_minibatches=None, concat=False, device='cpu'):
+    def iter_minibatch(self, n_minibatches=None, concat=False, device='cuda'): #change cpu to cuda
         if n_minibatches in [1, None]:
             yield slice(None), self.to_array(inplace=False, concat=concat).to_torch(device=device)
         else:
@@ -152,6 +186,9 @@ class NamedArrays(dict):
         return cls((k, get_concat(v)([x[k] for x in named_arrays])) for k, v in named_arrays[0].items())
 
 class Dist:
+    '''
+    A wrapper around torch.distributions to provide a common interface for different types of distributions
+    '''
     def __init__(self, inputs):
         self.inputs = inputs
 
@@ -259,12 +296,14 @@ class FFN(nn.Module):
         s_sizes = [c.observation_space.shape[0], *layers.s]
 
         self.shared = build_fc(*s_sizes)
-
+        self.shared.to(c.device)
         self.p_head = build_fc(s_sizes[-1], *layers.p, c.model_output_size)
+        self.p_head.to(c.device)
         self.sequential_init(self.p_head, 'policy')
         self.v_head = None
         if c.use_critic:
             self.v_head = build_fc(s_sizes[-1], *layers.v, 1)
+            self.v_head.to(c.device)
             self.sequential_init(self.v_head, 'value')
 
     def sequential_init(self, seq, key):
@@ -336,7 +375,7 @@ def calc_adv_multi_agent(id_, reward, gamma, value_=None, lam=None):
 
 class Algorithm:
     def __init__(self, c):
-        self.c = c.setdefaults(normclip=None, use_critic=True, lam=1, batch_concat=False, device='cpu')
+        self.c = c.setdefaults(normclip=None, use_critic=True, lam=1, batch_concat=False, device='cuda') # change cpu to cuda
 
     def on_step_start(self):
         return {}
@@ -494,7 +533,15 @@ class PPO(Algorithm):
                     stats['value_loss'] = value_loss
                 self.step_loss(loss)
                 batch_stats.append(from_torch(stats))
-            c.log_stats(pd.DataFrame(batch_stats).mean(axis=0), ii=i_gd, n_ii=c.n_gds)
+            #c.log_stats(pd.DataFrame(batch_stats).mean(axis=0), ii=i_gd, n_ii=c.n_gds)
+            # fix for logging
+            df = pd.DataFrame(batch_stats)
+            # Convert array columns to numeric
+            for col in df.columns:
+                if df[col].dtype == 'object':  # likely contains arrays
+                    df[col] = df[col].apply(lambda x: x.item() if hasattr(x, 'item') else x)
+
+            c.log_stats(df.mean(axis=0), ii=i_gd, n_ii=c.n_gds)
 
         if c.klcoef:
             kl = from_torch(kl)
