@@ -259,7 +259,7 @@ class Main(Config):
         log = c.get_log_ii(ii, n_ii)
         log(**stats)
         log(
-            global_reward=np.mean(rollout.global_reward) if 'global_reward' in rollout else None,
+            global_reward_mean=np.mean(rollout.global_reward) if 'global_reward' in rollout else None,
             reward_mean=np.mean(reward),
             value_mean=np.mean(value_) if c.use_critic else None,
             ret_mean=np.mean(ret),
