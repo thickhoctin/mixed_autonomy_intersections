@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: intersection.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "intersection.py",
+            "console": "integratedTerminal",
+            "args": [
+                "results/fourway_1x1_penetration0.5_turn_adam_ppo",
+                "render",
+                "n_rollouts_per_step=1"
+            ]
+        }
+    ]
+}
