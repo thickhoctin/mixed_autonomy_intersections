@@ -255,8 +255,30 @@ class GridEnv(Env):
         sort_id = lambda d: [v for k, v in sorted(d.items())]
         ids = sorted(obs)
         obs = arrayf(sort_id(obs)).reshape(-1, c._n_obs)
-        reward = len(ts.new_arrived) - c.collision_coef * len(ts.new_collided)
-        return Namespace(obs=obs, id=ids, reward=reward)
+        
+        
+        # If using PPO
+        if c.use_critic:
+            # Make reward becomes global reward
+            global_reward = len(ts.new_arrived) - c.collision_coef * len(ts.new_collided)
+            # Added new individual reward for each RL vehicle
+            reward = {}
+            for veh in prev_rls:
+                in_reward = 0
+                if ts.new_arrived or ts.new_collided:            
+                    if veh in ts.new_arrived:
+                        in_reward += 1
+                    if veh in ts.new_collided:
+                        in_reward -= c.collision_coef
+                # Add the global reward portion for each RL vehicle
+                in_reward += global_reward / len(prev_rls) if len(prev_rls) else 0
+                reward[veh.id] = in_reward
+            # Sort and convert to arrays
+            reward = arrayf(sort_id(reward))
+            return Namespace(obs=obs, id=ids, global_reward=global_reward, reward=reward)
+        else:
+            reward = len(ts.new_arrived) - c.collision_coef * len(ts.new_collided)
+            return Namespace(obs=obs, id=ids, reward=reward)
 
     def append_step_info(self):
         super().append_step_info()
@@ -289,30 +311,30 @@ class GridExp(Main):
             return Box(low=c.low, high=1, shape=(1,), dtype=np.float32)
         else:
             return Discrete(c.n_actions)
+    # Comment on_rollout_end since not used
+    # def on_rollout_end(c, rollout, stats, ii=None, n_ii=None):
+    #     log = c.get_log_ii(ii, n_ii)
+    #     step_obs_ = rollout.obs
+    #     step_obs = step_obs_[:-1]
+        
+    #     ret, adv = calc_adv(rollout.reward, c.gamma, rollout.value)
 
-    def on_rollout_end(c, rollout, stats, ii=None, n_ii=None):
-        log = c.get_log_ii(ii, n_ii)
-        step_obs_ = rollout.obs
-        step_obs = step_obs_[:-1]
+    #     n_veh = np.array([len(o) for o in step_obs])
+    #     step_ret = [[r] * nv for r, nv in zip(ret, n_veh)]
+    #     rollout.update(obs=step_obs, ret=step_ret, adv=adv)
 
-        ret, _ = calc_adv(rollout.reward, c.gamma)
+    #     step_id_ = rollout.pop('id')
+    #     id = np.concatenate(step_id_[:-1])
+    #     id_unique = np.unique(id)
 
-        n_veh = np.array([len(o) for o in step_obs])
-        step_ret = [[r] * nv for r, nv in zip(ret, n_veh)]
-        rollout.update(obs=step_obs, ret=step_ret)
+    #     reward = np.array(rollout.pop('reward'))
+    #     raw_reward = np.array(rollout.pop('raw_reward'))
 
-        step_id_ = rollout.pop('id')
-        id = np.concatenate(step_id_[:-1])
-        id_unique = np.unique(id)
-
-        reward = np.array(rollout.pop('reward'))
-        raw_reward = np.array(rollout.pop('raw_reward'))
-
-        log(**stats)
-        log(raw_reward_mean=raw_reward.mean(), raw_reward_sum=raw_reward.sum())
-        log(reward_mean=reward.mean(), reward_sum=reward.sum())
-        log(n_veh_step_mean=n_veh.mean(), n_veh_step_sum=n_veh.sum(), n_veh_unique=len(id_unique))
-        return rollout
+    #     log(**stats)
+    #     log(raw_reward_mean=raw_reward.mean(), raw_reward_sum=raw_reward.sum())
+    #     log(reward_mean=reward.mean(), reward_sum=reward.sum())
+    #     log(n_veh_step_mean=n_veh.mean(), n_veh_step_sum=n_veh.sum(), n_veh_unique=len(id_unique))
+    #     return rollout
 
 if __name__ == '__main__':
     c = GridExp.from_args(globals(), locals()) # Initialize configuration 
@@ -364,5 +386,5 @@ if __name__ == '__main__':
     if c.directions == '4way':
         c.directions = ['up', 'right', 'down', 'left']
     c._n_obs = 2 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
-    assert c.alg == PG, 'Not supporting value functions yet'
+    #assert c.alg == PG, 'Not supporting value functions yet'
     c.run()
