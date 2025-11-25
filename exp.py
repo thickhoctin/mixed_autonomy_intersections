@@ -209,7 +209,7 @@ class Main(Config):
         a_space = c.action_space
         step = 0
         while step < c.horizon + c.skip_stat_steps and not done:
-            pred = from_torch(c._model(to_torch(rollout.obs[-1]), value=False, policy=True, argmax=False))
+            pred = from_torch(c._model(to_torch(rollout.obs[-1]), value=True, policy=True, argmax=False)) # Change value = True
             if c.get('aclip', True) and isinstance(a_space, Box):
                 pred.action = np.clip(pred.action, a_space.low, a_space.high)
             rollout.append(**pred)
@@ -259,6 +259,7 @@ class Main(Config):
         log = c.get_log_ii(ii, n_ii)
         log(**stats)
         log(
+            global_reward=np.mean(rollout.global_reward) if 'global_reward' in rollout else None,
             reward_mean=np.mean(reward),
             value_mean=np.mean(value_) if c.use_critic else None,
             ret_mean=np.mean(ret),
@@ -285,7 +286,12 @@ class Main(Config):
     def train(c):
         
         c.on_train_start()
-        c._i = 0
+        if c.load_step:     
+            c._i = c.set_state(c._model, c._opt, step=c.load_step)
+            c.log('Loaded model from step %s' % c._i)
+        else:
+            c._i = 0
+            c.log('Starting training from beginning')
         while c._i < c.n_steps:
             c.on_step_start()
             with torch.no_grad():
