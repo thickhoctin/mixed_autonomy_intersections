@@ -1082,7 +1082,7 @@ class NormEnv(gymnasium.Env):
             self._reward_stats.update(reward)
             reward = reward - self._reward_stats.mean
         if c.norm_reward:
-            self._running_ret = self._running_ret * c.gamma + reward # estimation of return
+            self._running_ret = self._running_ret * c.gamma + reward.mean() # estimation of return
             self._return_stats.update(self._running_ret)
             normed_r = reward / (self._return_stats.std + 1e-8) # norm reward by std of return
             reward = np.clip(normed_r, -c.reward_clip, c.reward_clip)
