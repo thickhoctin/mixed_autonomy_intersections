@@ -277,7 +277,7 @@ def build_dist(space):
 
 def build_fc(input_size, *sizes_and_modules):
     layers = []
-    str_map = dict(relu=nn.ReLU(inplace=True), tanh=nn.Tanh(), sigmoid=nn.Sigmoid(), flatten=nn.Flatten(), softmax=nn.Softmax())
+    str_map = dict(relu=nn.ReLU(inplace=True), tanh=nn.Tanh(), sigmoid=nn.Sigmoid(), flatten=nn.Flatten(), softmax=nn.Softmax(), leaky_relu=nn.LeakyReLU(0.01, inplace=True))
     for x in sizes_and_modules:
         if isinstance(x, (int, np.integer)):
             input_size, x = x, nn.Linear(input_size, x)
@@ -289,7 +289,8 @@ def build_fc(input_size, *sizes_and_modules):
 class FFN(nn.Module):
     def __init__(self, c):
         super().__init__()
-        self.c = c.setdefaults(layers=[64, 'tanh', 64, 'tanh'], weight_scale='default', weight_init='orthogonal')
+        # Change 64 64 tanh to leaky_relu to try to solve small kl problem
+        self.c = c.setdefaults(layers=[64, 'leaky_relu', 64, 'leaky_relu'], weight_scale='default', weight_init='orthogonal')
         layers = c.layers
         if isinstance(layers, list):
             layers = Namespace(s=[], v=layers, p=layers)
@@ -540,7 +541,7 @@ class PPO(Algorithm):
             for col in df.columns:
                 if df[col].dtype == 'object':  # likely contains arrays
                     df[col] = df[col].apply(lambda x: x.item() if hasattr(x, 'item') else x)
-
+            
             c.log_stats(df.mean(axis=0), ii=i_gd, n_ii=c.n_gds)
 
         if c.klcoef:
