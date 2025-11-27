@@ -272,6 +272,7 @@ class Main(Config):
     def on_step_end(c, stats={}):
         c.log_stats(stats, print_time=True)
         c.log('')
+        clear_gpu_memory()
 
     def on_train_end(c):
         if c._results is not None:
@@ -282,6 +283,7 @@ class Main(Config):
             c._writer.close()
         if hasattr(c._env, 'close'):
             c._env.close()
+        clear_gpu_memory()
 
     def train(c):
         
