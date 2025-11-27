@@ -13,7 +13,11 @@ class GridEnv(Env):
         default_flows = lambda flow_id, route_id, flow_rate: [E('flow', **params) for params in [
             FLOW(f'{flow_id}', type='generic', route=route_id, departSpeed=c.depart_speed, vehsPerHour=flow_rate),
         ] if params.get('vehsPerHour')]
-        
+        # Add flow for poisson distribution
+        poisson_flows = lambda flow_id, route_id, period: [E('flow', **params) for params in [
+            FLOW(f'{flow_id}', type='generic', route=route_id, departSpeed=c.depart_speed, period=period),
+        ]]
+
         builder = NetBuilder()
         xys = np.array(np.ones((c.n_rows + 2, c.n_cols + 2)).nonzero()).T * c.length
         nodes = builder.add_nodes(
@@ -44,8 +48,11 @@ class GridEnv(Env):
                 route_id, flow_id = f'r_{direction}_{i}', f'f_{direction}_{i}'
                 _, _, route = builder.chain(chain, route_id=route_id, edge_attrs=edge_attrs)
                 routes_by_dir[direction].append(route)
-                flows.extend(default_flows(flow_id, route_id, flow_rate))
-
+                if c.use_poisson:
+                    period = f"exp({3600 / flow_rate: .2f})"
+                    flows.extend(poisson_flows(flow_id, route_id, period))
+                else:
+                    flows.extend(default_flows(flow_id, route_id, flow_rate))
         # Add turn routes if enabled
         if c.chain_lr:
             connections, turn_routes = builder.chain_leftright(builder.edges.values(), edge_attrs=edge_attrs)
@@ -77,8 +84,6 @@ class GridEnv(Env):
                     if direction in flow.id:
                         flow.route = dist_id
                 
-
-
         tls = []
         if tl:
             tl = 1000000 if tl == 'MaxPressure' else tl
