@@ -14,6 +14,7 @@ class GridEnv(Env):
             FLOW(f'{flow_id}', type='generic', route=route_id, departSpeed=c.depart_speed, vehsPerHour=flow_rate),
         ] if params.get('vehsPerHour')]
         # Add flow for poisson distribution
+        # https://sumo.dlr.de/docs/Simulation/Randomness.html
         poisson_flows = lambda flow_id, route_id, period: [E('flow', **params) for params in [
             FLOW(f'{flow_id}', type='generic', route=route_id, departSpeed=c.depart_speed, period=period),
         ]]
@@ -48,7 +49,7 @@ class GridEnv(Env):
                 route_id, flow_id = f'r_{direction}_{i}', f'f_{direction}_{i}'
                 _, _, route = builder.chain(chain, route_id=route_id, edge_attrs=edge_attrs)
                 routes_by_dir[direction].append(route)
-                if c.use_poisson:
+                if c.use_poisson: 
                     period = f"exp({3600 / flow_rate: .2f})"
                     flows.extend(poisson_flows(flow_id, route_id, period))
                 else:
