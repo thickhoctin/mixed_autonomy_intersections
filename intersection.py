@@ -98,12 +98,25 @@ class GridEnv(Env):
             for node, offset in zip(nodes[1:-1, 1:-1].reshape(-1), offsets.reshape(-1)):
                 node.type = 'traffic_light'
                 phase_multiple = len(c.directions) // 2
-                tls.append(E('tlLogic',
-                    E('phase', duration=tl_v, state='Gr' * phase_multiple),
-                    *lif(yellow, E('phase', duration=yellow, state='yr' * phase_multiple)),
-                    E('phase', duration=tl_h, state='rG' * phase_multiple),
-                    *lif(yellow, E('phase', duration=yellow, state='ry' * phase_multiple)),
+                # Add traffic light logic for 4-way intersection with left-right turns
+                if c.chain_lr and c.directions == ['up', 'right', 'down', 'left']:
+                    tls.append(E('tlLogic',
+                    # Phase 1
+                    E('phase', duration=tl_v, state='gGGrrrgGGrrr'),
+                    *lif(yellow, E('phase', duration=yellow, state='yyyrrryyyrrr')),
+                    E('phase', duration=3, state='rrrrrrrrrrrr'),
+                    # Phase 2
+                    E('phase', duration=tl_h, state='rrrgGGrrrgGG' ),
+                    *lif(yellow, E('phase', duration=yellow, state='rrryyyrrryyy')),
+                    E('phase', duration=3, state='rrrrrrrrrrrr'),
                 id=node.id, offset=offset, type='static', programID='1'))
+                else:
+                    tls.append(E('tlLogic',
+                        E('phase', duration=tl_v, state='Gr' * phase_multiple),
+                        *lif(yellow, E('phase', duration=yellow, state='yr' * phase_multiple)),
+                        E('phase', duration=tl_h, state='rG' * phase_multiple),
+                        *lif(yellow, E('phase', duration=yellow, state='ry' * phase_multiple)),
+                    id=node.id, offset=offset, type='static', programID='1'))
 
         nodes, edges, connections, routes = builder.build()
         additional = E('additional', *types, *routes, *flows, *tls)
