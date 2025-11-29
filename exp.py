@@ -209,6 +209,13 @@ class Main(Config):
         a_space = c.action_space
         step = 0
         while step < c.horizon + c.skip_stat_steps and not done:
+            # Add function to handle no avs
+            if c.av_frac == 0:
+                ret = c._env.step([])
+                rollout.append(**ret)
+                ret.setdefault('done', False)
+                step += 1
+                continue
             pred = from_torch(c._model(to_torch(rollout.obs[-1]), value=True, policy=True, argmax=False)) # Change value = True
             if c.get('aclip', True) and isinstance(a_space, Box):
                 pred.action = np.clip(pred.action, a_space.low, a_space.high)
@@ -230,7 +237,8 @@ class Main(Config):
         """ Compute value, calculate advantage, log stats """
         t_start = time()
         step_id_ = rollout.pop('id', None)
-        done = rollout.pop('done', None)
+        # add handle for no AVs
+        done = rollout.pop('done', None) if c.av_frac != 0 else [False] * len(rollout.reward)
         multi_agent = step_id_ is not None
 
         step_obs_ = rollout.obs
@@ -241,7 +249,11 @@ class Main(Config):
         if c.use_critic:
             (_, mb_), = rollout.filter('obs').iter_minibatch(concat=multi_agent, device=c.device)
             value_ = from_torch(c._model(mb_.obs, value=True).value.view(-1))
-
+        # If no AVs, skip advantage calculation and log only basic stats
+        if c.av_frac == 0:
+            log = c.get_log_ii(ii, n_ii)
+            log(**stats)
+            return rollout
         if multi_agent:
             step_n = [len(x) for x in rollout.reward]
             reward = np.concatenate(rollout.reward)
