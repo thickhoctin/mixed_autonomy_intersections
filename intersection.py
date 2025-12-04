@@ -262,15 +262,28 @@ class GridEnv(Env):
                                         jun_headtails[i: i + 2] = platoon.head, platoon.tail
                                         platoon = platoon.prev
                         route_vehs.append((jun_lane_route, jun_headtails))
-
-            dist_features, speed_features = [], []
+            # Build observation
+            dist_features, speed_features, turn_features = [], [], []
             for route, vehs in route_vehs:
                 j_pos = junction.route_position[route]
+                if c.chain_lr:
+                    for v in vehs:
+                        import math
+                        if math.isinf(v.route_position):
+                            turn_features.extend([0.5])
+                            continue
+                        if 'left' in v.route.id:
+                            turn_features.extend([0])
+                        elif 'right' in v.route.id:
+                            turn_features.extend([1])
+                        else:
+                            turn_features.extend([0.5])    
                 dist_features.extend([0 if j_pos == v.route_position else (j_pos - v.route_position) / max_dist for v in vehs])
                 speed_features.extend([v.speed / max_speed for v in vehs])
-
-            obs[veh.id] = np.clip([*dist_features, *speed_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
-
+            if c.chain_lr:
+                obs[veh.id] = np.clip([*dist_features, *speed_features, *turn_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
+            else: 
+                obs[veh.id] = np.clip([*dist_features, *speed_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low 
         sort_id = lambda d: [v for k, v in sorted(d.items())]
         ids = sorted(obs)
         obs = arrayf(sort_id(obs)).reshape(-1, c._n_obs)
@@ -290,7 +303,8 @@ class GridEnv(Env):
                     if veh in ts.new_collided:
                         in_reward -= c.collision_coef
                 # Add the global reward portion for each RL vehicle
-                in_reward += global_reward / len(prev_rls) if len(prev_rls) else 0
+                # Commented out to remove global reward from individual agents
+                # in_reward += global_reward / len(prev_rls) if len(prev_rls) else 0 
                 reward[veh.id] = in_reward
             # Sort and convert to arrays
             reward = arrayf(sort_id(reward))
@@ -404,6 +418,10 @@ if __name__ == '__main__':
     )
     if c.directions == '4way':
         c.directions = ['up', 'right', 'down', 'left']
-    c._n_obs = 2 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
+    if c.chain_lr:
+        # Added turn feature to observation  
+        c._n_obs = 3 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
+    else:
+        c._n_obs = 2 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1)) 
     #assert c.alg == PG, 'Not supporting value functions yet'
     c.run()
