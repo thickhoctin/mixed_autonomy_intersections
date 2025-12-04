@@ -249,6 +249,9 @@ class Main(Config):
         if c.use_critic:
             (_, mb_), = rollout.filter('obs').iter_minibatch(concat=multi_agent, device=c.device)
             value_ = from_torch(c._model(mb_.obs, value=True).value.view(-1))
+            # Normalize value
+            if c.get('value_norm'):
+                value_ = normalize(value_)
         # If no AVs, skip advantage calculation and log only basic stats
         if c.av_frac == 0:
             log = c.get_log_ii(ii, n_ii)
