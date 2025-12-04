@@ -270,12 +270,45 @@ class NetBuilder:
             con_key = (con['from'], con.to, con.fromLane, con.toLane)
             if con_key not in self.connections.keys():
                 self.connections.update({con_key: con})
-                route = E('route', id=f'r_turn_{r_id}' or f'r_{len(self.additional)}', edges=f'{con_key[0]} {con_key[1]}')
+                direction = self.get_turn_direction_angle(con_key[0], con_key[1])
+                route = E('route', id=f'r_turn_{direction}_{r_id}' or f'r_{len(self.additional)}', edges=f'{con_key[0]} {con_key[1]}')
                 routes.append(route)
                 r_id += 1
         self.additional.extend(routes)
         return connections, routes
+    
+    def get_turn_direction_angle(self, entry, exit):
+        import math
+        def pasrse_edge_coords(self, edge):
+            parts = edge.split('_')
+            # Start node
+            x1, y1 = map(float, parts[2].split('.'))
+            # End node
+            x2, y2 = map(float, parts[4].split('.'))
+            return (x1, y1), (x2, y2)
+        
+        # Get vectors
+        entry_start, entry_end = pasrse_edge_coords(self, entry)
+        exit_start, exit_end = pasrse_edge_coords(self, exit)
 
+        # Calculate angles
+        entry_angle = math.atan2(entry_end[1] - entry_start[1], entry_end[0] - entry_start[0])
+        exit_angle = math.atan2(exit_end[1] - exit_start[1], exit_end[0] - exit_start[0])
+
+        # Calculate angle difference
+        turn_angle = exit_angle - entry_angle
+
+        # Normalize angle to [-pi, pi]
+        while turn_angle <= -math.pi:
+            turn_angle += 2 * math.pi
+        while turn_angle > math.pi:
+            turn_angle -= 2 * math.pi
+        if turn_angle > 0:
+            return 'left'
+        elif turn_angle < 0:
+            return 'right'
+        else:
+            return 'straight'
     def build(self):
         return E('nodes', *self.nodes.values()), E('edges', *self.edges.values()), E('connections', *self.connections.values()), self.additional
 
