@@ -1,7 +1,7 @@
 from u import *
 from exp import *
 from env import *
-
+import math
 class Platoon(Entity):
     pass
 
@@ -176,9 +176,14 @@ class GridEnv(Env):
         for veh, act in zip(prev_rls, action):
             if c.act_type == 'accel':
                 level = (np.clip(act, c.low, 1) - c.low) / (1 - c.low)
+                ts.accel(veh, (level * 2 - 1) * (c.max_accel if level > 0.5 else c.max_decel))
             else:
-                level = act / (c.n_actions - 1)
-            ts.accel(veh, (level * 2 - 1) * (c.max_accel if level > 0.5 else c.max_decel))
+                if c.n_actions == 5:
+                    accel_map = [-4.5, -c.max_decel, 0, c.max_accel, 2.6]
+                    ts.accel(veh, accel_map[act])
+                else:
+                    level = act / (c.n_actions - 1)
+                    ts.accel(veh, (level * 2 - 1) * (c.max_accel if level > 0.5 else c.max_decel))
 
         if c.tl == 'MaxPressure':
             self.mp_tlast += c.sim_step
@@ -265,19 +270,17 @@ class GridEnv(Env):
             # Build observation
             dist_features, speed_features, turn_features = [], [], []
             for route, vehs in route_vehs:
-                j_pos = junction.route_position[route]
-                if c.chain_lr:
-                    for v in vehs:
-                        import math
-                        if math.isinf(v.route_position):
-                            turn_features.extend([0.5])
-                            continue
-                        if 'left' in v.route.id:
-                            turn_features.extend([0])
-                        elif 'right' in v.route.id:
-                            turn_features.extend([1])
-                        else:
-                            turn_features.extend([0.5])    
+                j_pos = junction.route_position[route]                
+                for v in vehs:
+                    if math.isinf(v.route_position):
+                        turn_features.extend([0.5])
+                        continue
+                    if 'left' in v.route.id:
+                        turn_features.extend([0])
+                    elif 'right' in v.route.id:
+                        turn_features.extend([1])
+                    else:
+                        turn_features.extend([0.5])    
                 dist_features.extend([0 if j_pos == v.route_position else (j_pos - v.route_position) / max_dist for v in vehs])
                 speed_features.extend([v.speed / max_speed for v in vehs])
             if c.chain_lr:
