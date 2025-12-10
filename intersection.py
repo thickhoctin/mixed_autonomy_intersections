@@ -171,8 +171,18 @@ class GridEnv(Env):
         max_speed = c.max_speed
 
         rl_type = ts.types.rl
+        
         prev_rls = sorted(rl_type.vehicles, key=lambda x: x.id)
-
+        # Store vehicle before action
+        vehicle_prev = {}
+        for veh in ts.vehicles:
+            vehicle_prev[veh.id] = Namespace(position=veh.position, 
+                                             route_position=veh.route_position, 
+                                             speed=veh.speed, 
+                                             route=veh.route,
+                                             lane=veh.lane,
+                                             type=veh.type)
+            
         for veh, act in zip(prev_rls, action):
             if c.act_type == 'accel':
                 level = (np.clip(act, c.low, 1) - c.low) / (1 - c.low)
@@ -298,13 +308,25 @@ class GridEnv(Env):
             global_reward = len(ts.new_arrived) - c.collision_coef * len(ts.new_collided)
             # Added new individual reward for each RL vehicle
             reward = {}
+            penalty_rls = []
+            close_rls = {}
+            if ts.new_collided:
+                penalty_rls = self.check_collided(ts.new_collided, rl_type.vehicles, vehicle_prev)
+            if ts.new_arrived:
+                close_rls = self.check_arrived(ts.new_arrived, ts.new_collided, prev_rls, vehicle_prev)
             for veh in prev_rls:
                 in_reward = 0
                 if ts.new_arrived or ts.new_collided:            
                     if veh in ts.new_arrived:
                         in_reward += 1
+                    elif close_rls:
+                        if veh.id in close_rls:
+                            in_reward += close_rls[veh.id]
                     if veh in ts.new_collided:
                         in_reward -= c.collision_coef
+                    elif penalty_rls:
+                        if veh.id in penalty_rls:
+                            in_reward -= c.collision_coef / len(penalty_rls)
                 # Add the global reward portion for each RL vehicle
                 # Commented out to remove global reward from individual agents
                 # in_reward += global_reward / len(prev_rls) if len(prev_rls) else 0 
@@ -320,6 +342,38 @@ class GridEnv(Env):
         super().append_step_info()
         self.rollout_info.append(n_veh_network=len(self.ts.vehicles))
 
+    # Penalty for RL vehicles close to collided vehicles in the same lane or at the junction
+    def check_collided(self, collided_vehs, rl_vehs, vehicle_prev, c_dist_threshold=20):
+        ts = self.ts 
+        penalty_rls = []
+        for c_veh in collided_vehs:
+            c_veh = vehicle_prev[c_veh.id]
+            c_pos = np.array(c_veh.position)
+            for rl_veh in rl_vehs:
+                rl_pos = np.array(rl_veh.position)
+                dist = np.linalg.norm(c_pos - rl_pos)
+                # Check if RL vehicle is close to the collided vehicle and in the same lane or at the junction
+                if dist < c_dist_threshold and (rl_veh.lane == c_veh.lane or ':' in c_veh.lane.id):                    
+                    penalty_rls.append(rl_veh.id)
+        return penalty_rls
+    
+    # Reward for RL vehicles close to arrived vehicles in the same lane
+    def check_arrived(self, arrived_vehs, collided_vehs, prev_rls, vehicle_prev, a_dist_threshold=60):
+        ts = self.ts
+        close_rls = {}
+        for a_vehs in arrived_vehs: 
+            if a_vehs not in prev_rls:
+                a_vehs = vehicle_prev[a_vehs.id]
+                # Find a RL vehicle near the arrived vehicle
+                for rls in prev_rls:
+                    if rls in arrived_vehs or rls in collided_vehs:
+                        continue
+                    if rls.lane != a_vehs.lane:
+                        continue
+                    distance = np.linalg.norm(np.array(rls.position) - np.array(a_vehs.position))
+                    if distance < a_dist_threshold:
+                        close_rls[rls.id] = distance / a_dist_threshold
+        return close_rls
     @property
     def stats(self):
         c = self.c
