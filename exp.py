@@ -115,7 +115,7 @@ class Main(Config):
 
     def on_rollout_worker_start(c):
         c._env = c.create_env()
-        c.use_critic = False # Don't need value function on workers
+        c.setdefaults(use_critic=False) # Don't need value function on workers
         c.set_model()
         c._model.eval()
         c._i = 0
@@ -170,7 +170,11 @@ class Main(Config):
         if c.use_ray:
             import ray
             # Changed to .cpu() to .gpu() for Ray with GPU
-            weights_id = ray.put({k: v.cuda() for k, v in c._model.state_dict().items()})
+            # Send CPU tensors to workers, regardless of main process device
+            if c.device.startswith('cuda'):
+                weights_id = ray.put({k: v.cpu() for k, v in c._model.state_dict().items()})
+            else:
+                weights_id = ray.put({k: v for k, v in c._model.state_dict().items()})
             [w.set_weights.remote(weights_id) for w in c._rollout_workers]
             rollout_stats = flatten(ray.get([w.rollouts_single_process.remote() for w in c._rollout_workers]))
         else:
@@ -378,18 +382,34 @@ class Main(Config):
                 c.setdefaults(n_workers=c.n_rollouts_per_step, use_ray=True)
                 c.n_rollouts_per_worker = c.n_rollouts_per_step // c.n_workers
                 import ray
+                import multiprocessing
+                # Limit workers to available CPUs
+                n_cpus_available = multiprocessing.cpu_count()
+                c.log(f"Available CPU cores: {n_cpus_available}")
+                c.log(f"Requested workers: {c.n_workers}")
+                c.log(f"Available GPUs: {n_gpus}")
+                # Use up to 12 CPUs for workers
+                n_workers_actual = min(c.n_workers, 12, n_cpus_available - 1)  # Leave 1 CPU for main process
+                if n_workers_actual != c.n_workers:
+                    c.log(f"Adjusting workers from {c.n_workers} to {n_workers_actual} to fit available CPUs")
+                    c.n_workers = n_workers_actual
+                    c.n_rollouts_per_worker = c.n_rollouts_per_step // c.n_workers
                 try:
+                    # Initialize Ray with CPUs for workers + main process
                     ray.init(num_cpus=c.n_workers, num_gpus=n_gpus, include_dashboard=False)
                 except:
                     ray.init(num_cpus=c.n_workers, num_gpus=1, include_dashboard=False, _temp_dir=(Main.code_root/ 'tmp')._real)
+                # Ensure flow rates are set in main config before creating workers
+                c.setdefaults(
+                    flow_rate_h=c.get('flow_rate', 700),
+                    flow_rate_v=c.get('flow_rate', 700)
+                )
                 worker_kwargs = c.get('worker_kwargs') or [{}] * c.n_workers
-                #assert len(worker_kwargs) == c.n_workers
-                if c.get('device') == 'cpu':
-                    RemoteMain = ray.remote(type(c)) 
-                    worker_kwargs = [{**c, 'main': False, 'device': 'cpu', **args} for args in worker_kwargs]
-                else:
-                    RemoteMain = ray.remote(num_gpus= 1)(type(c))
-                    worker_kwargs = [{**c, 'main': False, 'device': 'cuda', **args} for args in worker_kwargs]
+                # assert len(worker_kwargs) == c.n_workers
+                
+                RemoteMain = ray.remote(num_cpus=1, num_gpus=0)(type(c)) 
+                worker_kwargs = [{**c, 'main': False, 'device': 'cpu', **args} for args in worker_kwargs]
+                
                 c._rollout_workers = [RemoteMain.remote(**kwargs, i_worker=i) for i, kwargs in enumerate(worker_kwargs)]
                 ray.get([w.on_rollout_worker_start.remote() for w in c._rollout_workers])
                 
