@@ -313,8 +313,14 @@ class GridEnv(Env):
         
         # If using PPO
         if c.use_critic:
+            # Cumulative collision count from rollout_info (already tracked per step)
+            collision_count = sum(self.rollout_info['collisions'])
+            
+            # Progressive penalty: each subsequent collision gets higher penalty
+            collision_penalty_multiplier = c.get('collision_penalty_growth', 1.0)
+            current_collision_coef = c.collision_coef * (collision_penalty_multiplier ** collision_count)
             # Make reward becomes global reward
-            global_reward = len(ts.new_arrived) - c.collision_coef * len(ts.new_collided)
+            global_reward = len(ts.new_arrived) - current_collision_coef * len(ts.new_collided)
             # Added new individual reward for each RL vehicle
             reward = {}
             penalty_rls = []
@@ -332,10 +338,10 @@ class GridEnv(Env):
                         if veh.id in close_rls:
                             in_reward += close_rls[veh.id]
                     if veh in ts.new_collided:
-                        in_reward -= c.collision_coef
+                        in_reward -= current_collision_coef
                     elif penalty_rls:
                         if veh.id in penalty_rls:
-                            in_reward -= c.collision_coef / len(penalty_rls)
+                            in_reward -= current_collision_coef / len(penalty_rls)
                 # Add the global reward portion for each RL vehicle
                 # Commented out to remove global reward from individual agents
                 # in_reward += global_reward / len(prev_rls) if len(prev_rls) else 0 
