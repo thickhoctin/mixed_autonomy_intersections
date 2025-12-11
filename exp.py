@@ -182,6 +182,8 @@ class Main(Config):
         rollouts = [c.on_rollout_end(*rollout_stat, ii=ii, n_ii=c.n_rollouts_per_step) for ii, rollout_stat in enumerate(rollout_stats)]
         # Clean up
         del rollout_stats
+        if weights_id:
+            del weights_id
         import gc
         gc.collect()
         return NamedArrays.concat(rollouts, fn=flatten)
