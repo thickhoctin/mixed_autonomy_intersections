@@ -180,6 +180,10 @@ class Main(Config):
         else:
             rollout_stats = c.rollouts_single_process()
         rollouts = [c.on_rollout_end(*rollout_stat, ii=ii, n_ii=c.n_rollouts_per_step) for ii, rollout_stat in enumerate(rollout_stats)]
+        # Clean up
+        del rollout_stats
+        import gc
+        gc.collect()
         return NamedArrays.concat(rollouts, fn=flatten)
 
     def rollouts_single_process(c):
@@ -291,8 +295,21 @@ class Main(Config):
     def on_step_end(c, stats={}):
         c.log_stats(stats, print_time=True)
         c.log('')
+        # Enhanced cleanup
+        import gc
+        gc.collect()
         clear_gpu_memory()
-
+        
+        # For Ray workers, trigger garbage collection
+        if hasattr(c, '_rollout_workers'):
+            import ray
+            ray.get([w.clear_memory.remote() for w in c._rollout_workers])
+    def clear_memory(c):  # Add this new method for workers
+        """Clean up memory in worker process"""
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            clear_gpu_memory()
     def on_train_end(c):
         if c._results is not None:
             c.save_train_results(c._results)
