@@ -278,10 +278,19 @@ class GridEnv(Env):
                                         platoon = platoon.prev
                         route_vehs.append((jun_lane_route, jun_headtails))
             # Build observation
-            dist_features, speed_features, turn_features = [], [], []
+            ego_pos = np.array(veh.position)
+            dist_features, speed_features, turn_features, veh_dist_features = [], [], [], []
             for route, vehs in route_vehs:
                 j_pos = junction.route_position[route]                
                 for v in vehs:
+                    if not math.isinf(v.route_position):
+                        v_pos = np.array(v.position)
+                        # Distance feature
+                        dist = np.linalg.norm(v_pos - ego_pos) / max_dist
+                        veh_dist_features.extend([np.clip(dist, 0, 1)])
+                    else:
+                        veh_dist_features.extend([1])
+                    # Turn feature
                     if math.isinf(v.route_position):
                         turn_features.extend([0.5])
                         continue
@@ -294,7 +303,7 @@ class GridEnv(Env):
                 dist_features.extend([0 if j_pos == v.route_position else (j_pos - v.route_position) / max_dist for v in vehs])
                 speed_features.extend([v.speed / max_speed for v in vehs])
             if c.chain_lr:
-                obs[veh.id] = np.clip([*dist_features, *speed_features, *turn_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
+                obs[veh.id] = np.clip([*dist_features, *speed_features, *turn_features, *veh_dist_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
             else: 
                 obs[veh.id] = np.clip([*dist_features, *speed_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low 
         sort_id = lambda d: [v for k, v in sorted(d.items())]
@@ -477,7 +486,7 @@ if __name__ == '__main__':
         c.directions = ['up', 'right', 'down', 'left']
     if c.chain_lr:
         # Added turn feature to observation  
-        c._n_obs = 3 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
+        c._n_obs = 4 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
     else:
         c._n_obs = 2 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1)) 
     #assert c.alg == PG, 'Not supporting value functions yet'
