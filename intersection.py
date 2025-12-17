@@ -181,7 +181,8 @@ class GridEnv(Env):
                                              speed=veh.speed, 
                                              route=veh.route,
                                              lane=veh.lane,
-                                             type=veh.type)
+                                             type=veh.type,
+                                             laneposition=veh.laneposition)
             
         for veh, act in zip(prev_rls, action):
             if c.act_type == 'accel':
@@ -333,7 +334,7 @@ class GridEnv(Env):
                 in_reward = 0
                 if ts.new_arrived or ts.new_collided:            
                     if veh in ts.new_arrived:
-                        in_reward += 1
+                        in_reward += 2 # Increase reward for arrived vehicles
                     elif close_rls:
                         if veh.id in close_rls:
                             in_reward += close_rls[veh.id]
@@ -343,8 +344,7 @@ class GridEnv(Env):
                         if veh.id in penalty_rls:
                             in_reward -= current_collision_coef / len(penalty_rls)
                 # Add the global reward portion for each RL vehicle
-                # Commented out to remove global reward from individual agents
-                # in_reward += global_reward / len(prev_rls) if len(prev_rls) else 0 
+                in_reward += global_reward / len(prev_rls) if len(prev_rls) else 0 
                 reward[veh.id] = in_reward
             # Sort and convert to arrays
             reward = arrayf(sort_id(reward))
@@ -367,8 +367,8 @@ class GridEnv(Env):
             for rl_veh in rl_vehs:
                 rl_pos = np.array(rl_veh.position)
                 dist = np.linalg.norm(c_pos - rl_pos)
-                # Check if RL vehicle is close to the collided vehicle and in the same lane or at the junction
-                if dist < c_dist_threshold and (rl_veh.lane == c_veh.lane or ':' in c_veh.lane.id):                    
+                # Check if RL vehicle is ahead and close to the collided vehicle and in the same lane or at the junction
+                if dist < c_dist_threshold and ((rl_veh.lane == c_veh.lane and rl_veh.laneposition < c_veh.laneposition) or ':' in c_veh.lane.id):                    
                     penalty_rls.append(rl_veh.id)
         return penalty_rls
     
@@ -444,7 +444,7 @@ class GridExp(Main):
 if __name__ == '__main__':
     c = GridExp.from_args(globals(), locals()) # Initialize configuration 
     c.setdefaults(
-        n_steps=200,
+        n_steps=300,
         step_save=5,
 
         depart_speed=0,
