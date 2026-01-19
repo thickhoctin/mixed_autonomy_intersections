@@ -495,5 +495,5 @@ if __name__ == '__main__':
         c._n_obs = 4 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
     else:
         c._n_obs = 2 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1)) 
-    #assert c.alg == PG, 'Not supporting value functions yet'
+    
     c.run()
