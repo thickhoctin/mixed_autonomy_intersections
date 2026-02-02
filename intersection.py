@@ -292,15 +292,16 @@ class GridEnv(Env):
                     else:
                         veh_dist_features.extend([1])
                     # Turn feature
+                    # Change from linear to one-hot encoding for left/right/straight
                     if math.isinf(v.route_position):
-                        turn_features.extend([0.5])
+                        turn_features.extend([0, 1, 0])
                         continue
                     if 'left' in v.route.id:
-                        turn_features.extend([0])
+                        turn_features.extend([1, 0, 0])
                     elif 'right' in v.route.id:
-                        turn_features.extend([1])
+                        turn_features.extend([0, 0, 1])
                     else:
-                        turn_features.extend([0.5])    
+                        turn_features.extend([0, 1, 0])    
                 dist_features.extend([0 if j_pos == v.route_position else (j_pos - v.route_position) / max_dist for v in vehs])
                 speed_features.extend([v.speed / max_speed for v in vehs])
             if c.chain_lr:
@@ -492,7 +493,7 @@ if __name__ == '__main__':
         c.directions = ['up', 'right', 'down', 'left']
     if c.chain_lr:
         # Added turn feature to observation  
-        c._n_obs = 4 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
+        c._n_obs = 6 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
     else:
         c._n_obs = 2 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1)) 
     
