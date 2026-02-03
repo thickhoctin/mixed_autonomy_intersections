@@ -340,6 +340,92 @@ class FFN(nn.Module):
                 pred.action = dist.argmax() if argmax else dist.sample()
         return pred
 
+class AttentionFFN(nn.Module):
+    def __init__(self, c):
+        super().__init__()
+        self.c = c.setdefaults(layers=[64, 'leaky_relu', 64, 'leaky_relu'], weight_scale='default', weight_init='orthogonal', n_heads=4)
+        
+        self.num_vehicle_obs = (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
+        self.embed_dim = 64
+        total_obs_dim = c.observation_space.shape[0]
+        self.agent_input_dim = total_obs_dim // self.num_vehicle_obs
+
+        # Embedding layer for each vehicle observation
+        self.embedding = nn.Sequential(
+            nn.Linear(self.agent_input_dim, self.embed_dim),
+            nn.LeakyReLU(inplace=True),
+        )
+        self.embedding.to(c.device)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=self.embed_dim, 
+            nhead=4, 
+            dim_feedforward=128,
+            batch_first=True) 
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=2)
+        self.transformer.to(c.device)
+
+        layers = c.layers
+        if isinstance(layers, list):
+            layers = Namespace(s=[], v=layers, p=layers)
+        
+        self.p_head = build_fc(self.embed_dim, *layers.p, c.model_output_size)
+        self.p_head.to(c.device)
+        self.sequential_init(self.p_head, 'policy')
+        self.sequential_init(self.embedding, 'shared')
+        self.v_head = None
+        if c.use_critic:
+            self.v_head = build_fc(self.embed_dim, *layers.v, 1)
+            self.v_head.to(c.device)
+            self.sequential_init(self.v_head, 'value')
+
+    def sequential_init(self, seq, key):
+        c = self.c
+        linears = [m for m in seq if isinstance(m, nn.Linear)]
+        for i, m in enumerate(linears):
+            if isinstance(c.weight_scale, (int, float)):
+                scale = c.weight_scale
+            elif isinstance(c.weight_scale, (list, tuple)):
+                scale = c.weight_scale[i]
+            elif isinstance(c.weight_scale, (dict)):
+                scale = c.weight_scale[key][i]
+            else:
+                scale = 0.01 if m == linears[-1] else 1
+            if c.weight_init == 'normc': # normalize along input dimension
+                weight = torch.randn_like(m.weight)
+                m.weight.data = weight * scale / weight.norm(dim=1, keepdim=True)
+            elif c.weight_init == 'orthogonal':
+                nn.init.orthogonal_(m.weight, gain=scale)
+            elif c.weight_init == 'xavier':
+                nn.init.xavier_normal_(m.weight, gain=scale)
+            nn.init.zeros_(m.bias)
+
+    def forward(self, inp, value=False, policy=False, argmax=None):
+        if inp.dim() == 2:
+            x = inp.view(-1, self.num_vehicle_obs, self.agent_input_dim)  # (batch_size, num_vehicles, agent_input_dim)
+        else:
+            x = inp  # (batch_size, num_vehicles, agent_input_dim)
+        
+        # TODO: Handle padding/masking for variable number of vehicles if necessary
+        # mask = (torch.abs(x).sum(dim=-1) == 0)  # (batch_size, num_vehicles)
+        # mask[:, 0] = False  # Ensure the ego vehicle is not masked
+
+        # Embedding
+        x_embed = self.embedding(x)  # (batch_size, num_vehicles, embed_dim)
+        x_trans = self.transformer(x_embed)  # (batch_size, num_vehicles, embed_dim)
+
+        # Use the embedding of the ego vehicle (first vehicle) for prediction
+        s = x_trans[:, 0, :]  
+
+        pred = Namespace()
+        if value and self.v_head:
+            pred.value = self.v_head(s).view(-1)
+        if policy or argmax is not None:
+            pred.policy = self.p_head(s)
+            if argmax is not None:
+                dist = self.c.dist_class(pred.policy)
+                pred.action = dist.argmax() if argmax else dist.sample()
+        return pred
+
 def calc_adv(reward, gamma, value_=None, lam=None):
     if value_ is None:
         return discount(reward, gamma), None # TD(1)
