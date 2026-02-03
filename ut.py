@@ -150,9 +150,10 @@ class NamedArrays(dict):
         if n_minibatches in [1, None]:
             yield slice(None), self.to_array(inplace=False, concat=concat).to_torch(device=device)
         else:
+            self_as_array = self.to_array(inplace=False, concat=concat)
             for idxs in np.array_split(np.random.permutation(len(self)), n_minibatches):
-                na = type(self)((k, v[idxs]) for k, v in self.items())
-                yield idxs, na.to_array(inplace=False, concat=concat).to_torch(device=device)
+                na = type(self)((k, v[idxs]) for k, v in self_as_array.items())
+                yield idxs, na.to_torch(device=device)
 
     def apply(self, fn, inplace=True):
         if inplace:
@@ -579,10 +580,13 @@ class PPO(Algorithm):
         c = self.c
         batch = rollouts.filter('obs', 'policy', 'action', 'pg_obj', 'ret', *lif(c.use_critic, 'value', 'adv'))
         value_warmup = c._i < c.get('n_value_warmup', 0)
-
+        if c.get('sgd_minibatch_size'):
+            n_minibatches = int(np.ceil(len(batch) / c.sgd_minibatch_size))
+        else:
+            n_minibatches = c.get('n_minibatches')
         for i_gd in range(c.n_gds):
             batch_stats = []
-            for idxs, mb in batch.iter_minibatch(c.get('n_minibatches'), concat=c.batch_concat, device=c.device):
+            for idxs, mb in batch.iter_minibatch(n_minibatches, concat=c.batch_concat, device=c.device):
                 if not len(mb):
                     continue
                 start_dist = c.dist_class(mb.policy)
