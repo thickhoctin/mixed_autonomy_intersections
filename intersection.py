@@ -485,6 +485,7 @@ if __name__ == '__main__':
         norm_reward=True,
         center_reward=True,
         opt='RMSprop',
+        use_attention=True,
 
         obs_tail=True,
         obs_next_cross_platoons=1,
