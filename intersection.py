@@ -333,6 +333,9 @@ class GridEnv(Env):
                 close_rls = self.check_arrived(ts.new_arrived, ts.new_collided, prev_rls, vehicle_prev)
             for veh in prev_rls:
                 in_reward = 0
+                # Add stall penalty if moving too slow
+                if veh.speed < 1.0:
+                    in_reward -= 0.1
                 if ts.new_arrived or ts.new_collided:            
                     if veh in ts.new_arrived:
                         in_reward += 2 # Increase reward for arrived vehicles
@@ -489,6 +492,8 @@ if __name__ == '__main__':
 
         obs_tail=True,
         obs_next_cross_platoons=1,
+
+        sgd_minibatch_size= 64,
     )
     if c.directions == '4way':
         c.directions = ['up', 'right', 'down', 'left']
