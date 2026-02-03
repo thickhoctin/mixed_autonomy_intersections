@@ -43,7 +43,10 @@ class Main(Config):
         raise NotImplementedError
 
     def set_model(c):
-        c._model = c.get('model_cls', FFN)(c)
+        if c.use_attention:
+            c._model = c.get('model_cls', AttentionFFN)(c)
+        else:
+            c._model = c.get('model_cls', FFN)(c)
         return c
 
     def schedule(c, coef, schedule=None):
