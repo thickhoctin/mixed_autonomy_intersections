@@ -336,7 +336,7 @@ class GridEnv(Env):
                 in_reward = 0
                 if ts.new_arrived or ts.new_collided:            
                     if veh in ts.new_arrived:
-                        in_reward += 5 # Increase reward for arrived vehicles
+                        in_reward += 1 # Increase reward for arrived vehicles
                     elif close_rls:
                         if veh.id in close_rls:
                             in_reward += close_rls[veh.id]
@@ -352,10 +352,10 @@ class GridEnv(Env):
                     leader_veh_distance = leader_veh[1]    
                     # Add stall penalty if moving too slow or too close to vehicle ahead
                     if veh.speed < 1.0 and leader_veh_distance > 1.5:
-                        in_reward -= 0.1
+                        in_reward -= 0.01
                     # Add reward for high speed if the street is empty ahead
                     if leader_veh_distance > 10.0:
-                        in_reward += veh.speed / max_speed * 0.1
+                        in_reward += veh.speed / max_speed * 0.01
                 # Add the global reward portion for each RL vehicle
                 in_reward += global_reward / len(prev_rls) if len(prev_rls) else 0 
                 reward[veh.id] = in_reward
