@@ -412,7 +412,8 @@ class AttentionFFN(nn.Module):
 
         # Embedding
         x_embed = self.embedding(x)  # (batch_size, num_vehicles, embed_dim)
-        x_trans = self.transformer(x_embed)  # (batch_size, num_vehicles, embed_dim)
+        with torch.nn.attention.sdpa_kernel([torch.nn.attention.SDPBackend.MATH]):
+            x_trans = self.transformer(x_embed)  # (batch_size, num_vehicles, embed_dim)
 
         # Use the embedding of the ego vehicle (first vehicle) for prediction
         s = x_trans[:, 0, :]  
