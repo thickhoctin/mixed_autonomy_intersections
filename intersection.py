@@ -504,7 +504,7 @@ if __name__ == '__main__':
         obs_tail=True,
         obs_next_cross_platoons=1,
 
-        sgd_minibatch_size= 32,
+        sgd_minibatch_size= 16,
     )
     if c.directions == '4way':
         c.directions = ['up', 'right', 'down', 'left']
