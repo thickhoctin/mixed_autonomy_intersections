@@ -347,7 +347,7 @@ class AttentionFFN(nn.Module):
         self.c = c.setdefaults(layers=[64, 'leaky_relu', 64, 'leaky_relu'], weight_scale='default', weight_init='orthogonal', n_heads=4)
         
         self.num_vehicle_obs = (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
-        self.embed_dim = 64
+        self.embed_dim = 128
         total_obs_dim = c.observation_space.shape[0]
         self.agent_input_dim = total_obs_dim // self.num_vehicle_obs
 
@@ -360,9 +360,9 @@ class AttentionFFN(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.embed_dim, 
             nhead=4, 
-            dim_feedforward=128,
+            dim_feedforward=512,
             batch_first=True) 
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=2)
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=3)
         self.transformer.to(c.device)
 
         layers = c.layers
@@ -565,6 +565,7 @@ class Imitation(Algorithm):
 class PPO(Algorithm):
     def __init__(self, c):
         super().__init__(c.setdefaults(use_critic=True, n_gds=30, pclip=0.3, vcoef=1, vclip=1, klcoef=0.2, kltarg=0.01, entcoef=0))
+        
 
     def on_step_start(self):
         stats = dict(klcoef=self.c.klcoef)
