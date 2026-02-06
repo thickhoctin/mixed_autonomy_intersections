@@ -459,7 +459,7 @@ class GridExp(Main):
 if __name__ == '__main__':
     c = GridExp.from_args(globals(), locals()) # Initialize configuration 
     c.setdefaults(
-        n_steps=300,
+        n_steps=500,
         step_save=5,
 
         depart_speed=0,
@@ -504,7 +504,7 @@ if __name__ == '__main__':
         obs_tail=True,
         obs_next_cross_platoons=1,
 
-        sgd_minibatch_size= 16,
+        sgd_minibatch_size= 32,
     )
     if c.directions == '4way':
         c.directions = ['up', 'right', 'down', 'left']
