@@ -908,7 +908,7 @@ def normalize(x, eps=1e-8):
     @param eps: Small value to avoid division by zero.
     @return: Normalized array.
     '''
-    return (x - x.mean()) / x.std()
+    return (x - x.mean()) / (x.std() + eps)
 
 def inverse_map(arr):
     '''
