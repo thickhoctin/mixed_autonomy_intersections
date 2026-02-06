@@ -624,7 +624,10 @@ class PPO(Algorithm):
                     value_loss = self.value_loss(pred.value, mb.ret, v_start=mb.value, mask=value_mask)
                     loss += c.vcoef * value_loss
                     stats['value_loss'] = value_loss
-                self.step_loss(loss)
+                # skip batch if loss is nan or inf
+                if torch.isnan(loss) or torch.isinf(loss):
+                    continue    
+                self.step_loss(loss)                
                 batch_stats.append(from_torch(stats))
             #c.log_stats(pd.DataFrame(batch_stats).mean(axis=0), ii=i_gd, n_ii=c.n_gds)
             # fix for logging
