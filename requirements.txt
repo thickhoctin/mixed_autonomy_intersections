@@ -9,3 +9,4 @@ pandas
 matplotlib
 jupyter
 tensorboard
+shapely
