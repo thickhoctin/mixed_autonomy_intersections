@@ -360,7 +360,7 @@ class AttentionFFN(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.embed_dim, 
             nhead=4, 
-            dim_feedforward=512,
+            dim_feedforward=256,
             batch_first=True) 
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=3)
         self.transformer.to(c.device)
