@@ -2,6 +2,7 @@ from u import *
 from exp import *
 from env import *
 import math
+from shapely.geometry import Polygon
 class Platoon(Entity):
     pass
 
@@ -217,7 +218,9 @@ class GridEnv(Env):
         self.build_platoon()
 
         obs = {}
-
+        distance_to_closest_dict = {}
+        self.veh_data_cache = {}
+        
         veh_default_close = Namespace(speed=max_speed, route_position=np.inf)
         veh_default_far = Namespace(speed=0, route_position=-np.inf)
         vehs_default = lambda: [veh_default_close] + [veh_default_far] * 2 * c.obs_next_cross_platoons
