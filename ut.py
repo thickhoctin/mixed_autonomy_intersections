@@ -401,19 +401,33 @@ class AttentionFFN(nn.Module):
             nn.init.zeros_(m.bias)
 
     def forward(self, inp, value=False, policy=False, argmax=None):
-        if inp.dim() == 2:
-            x = inp.view(-1, self.num_vehicle_obs, self.agent_input_dim)  # (batch_size, num_vehicles, agent_input_dim)
-        else:
-            x = inp  # (batch_size, num_vehicles, agent_input_dim)
+        # inp shape: [Batch_Size, 77]
+        # .view(-1, 11, N) means: Keep Batch size (-1), 11 Vehicles, N features per vehicle.
         
-        # TODO: Handle padding/masking for variable number of vehicles if necessary
-        # mask = (torch.abs(x).sum(dim=-1) == 0)  # (batch_size, num_vehicles)
-        # mask[:, 0] = False  # Ensure the ego vehicle is not masked
+        # 1. Intersection Distance (Indices 0-11)
+        f_inter_dist = inp[:, 0:11].view(-1, 11, 1)
+        
+        # 2. Speed (Indices 11-22)
+        f_speed      = inp[:, 11:22].view(-1, 11, 1)
+        
+        # 3. Turn Signal (Indices 22-55) -> 3 features per vehicle!
+        f_turn       = inp[:, 22:55].view(-1, 11, 3)
+        
+        # 4. Platoon Distance (Indices 55-66)
+        f_platoon    = inp[:, 55:66].view(-1, 11, 1)
+        
+        # 5. Closest Threat (Indices 66-77) -> This is the NEW one
+        f_threat     = inp[:, 66:77].view(-1, 11, 1)
+        f_threat_norm = torch.clamp(f_threat, -1.0, 1.0)
+        src_key_padding_mask = (f_turn.max(dim=2).values == -1)
+        src_key_padding_mask[:, 0] = False
+        # stack
+        x = torch.cat([f_inter_dist, f_speed, f_turn, f_platoon, f_threat_norm], dim=2)
 
         # Embedding
         x_embed = self.embedding(x)  # (batch_size, num_vehicles, embed_dim)
         with torch.nn.attention.sdpa_kernel([torch.nn.attention.SDPBackend.MATH]):
-            x_trans = self.transformer(x_embed)  # (batch_size, num_vehicles, embed_dim)
+            x_trans = self.transformer(x_embed, src_key_padding_mask=src_key_padding_mask)  # (batch_size, num_vehicles, embed_dim)
 
         # Use the embedding of the ego vehicle (first vehicle) for prediction
         s = x_trans[:, 0, :]  
@@ -564,7 +578,7 @@ class Imitation(Algorithm):
 
 class PPO(Algorithm):
     def __init__(self, c):
-        super().__init__(c.setdefaults(use_critic=True, n_gds=30, pclip=0.3, vcoef=1, vclip=1, klcoef=0.2, kltarg=0.01, entcoef=0))
+        super().__init__(c.setdefaults(use_critic=True, n_gds=30, pclip=0.3, vcoef=1, vclip=1, klcoef=0.2, kltarg=0.02, entcoef=0))
         
 
     def on_step_start(self):
