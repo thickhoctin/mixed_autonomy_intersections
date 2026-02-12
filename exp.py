@@ -72,12 +72,17 @@ class Main(Config):
         total_time = time() - c._run_start_time
         if print_time:
             stats['total_time'] = total_time
-
+        def format_seconds(t):
+            days, rem = divmod(t, 86400)
+            hours, rem = divmod(rem, 3600)
+            minutes, seconds = divmod(rem, 60)
+            return f"{int(days)}d {int(hours)}h {int(minutes)}m {int(seconds)}s"
         prints = []
         if ii is not None:
             prints.append('ii {:2d}'.format(ii))
 
         prints.extend('{} {:.3g}'.format(*kv) for kv in stats.items())
+        prints.append(f"Total step time {format_seconds(time() - c._run_start_time_step)}" if print_time else '')
 
         widths = [len(x) for x in prints]
         line_w = terminal_width()
@@ -160,6 +165,7 @@ class Main(Config):
 
     def on_step_start(c, stats={}):
         lr = c._lr
+        c._run_start_time_step = time()
         for g in c._opt.param_groups:
             g['lr'] = float(lr)
         c.log_stats(dict(**stats, **c._alg.on_step_start(), lr=lr))
@@ -327,7 +333,7 @@ class Main(Config):
         clear_gpu_memory()
 
     def train(c):
-        
+        c._run_start_time = time()
         c.on_train_start()
         if c.load_step:     
             c._i = c.set_state(c._model, c._opt, step=c.load_step)
