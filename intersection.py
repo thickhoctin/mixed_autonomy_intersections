@@ -283,7 +283,7 @@ class GridEnv(Env):
                         route_vehs.append((jun_lane_route, jun_headtails))
             # Build observation
             ego_pos = np.array(veh.position)
-            dist_features, speed_features, turn_features, veh_dist_features = [], [], [], []
+            dist_features, speed_features, turn_features, veh_dist_features, distance_to_closest_features = [], [], [], [], []
             for route, vehs in route_vehs:
                 j_pos = junction.route_position[route]                
                 for v in vehs:
@@ -293,22 +293,29 @@ class GridEnv(Env):
                         dist = np.linalg.norm(v_pos - ego_pos) / max_dist
                         veh_dist_features.extend([np.clip(dist, 0, 1)])
                     else:
-                        veh_dist_features.extend([1])
+                        veh_dist_features.extend([1.0])
                     # Turn feature
                     # Change from linear to one-hot encoding for left/right/straight
                     if math.isinf(v.route_position):
-                        turn_features.extend([0, 1, 0])
+                        turn_features.extend([0, 0, 0])
+                        distance_to_closest_features.extend([1.0])                               
                         continue
                     if 'left' in v.route.id:
                         turn_features.extend([1, 0, 0])
                     elif 'right' in v.route.id:
                         turn_features.extend([0, 0, 1])
                     else:
-                        turn_features.extend([0, 1, 0])    
+                        turn_features.extend([0, 1, 0])
+                    # Add distance to leader for ego vehicle
+                    distance_to_closest = self.get_closest_threat(v)                    
+                    distance_to_closest_features.extend([float(next(iter(distance_to_closest.values()))) / max_dist])
+                    distance_to_closest_dict.update(distance_to_closest)
                 dist_features.extend([0 if j_pos == v.route_position else (j_pos - v.route_position) / max_dist for v in vehs])
                 speed_features.extend([v.speed / max_speed for v in vehs])
             if c.chain_lr:
-                obs[veh.id] = np.clip([*dist_features, *speed_features, *turn_features, *veh_dist_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
+                # obs[veh.id] = np.clip([*dist_features, *speed_features, *turn_features, *veh_dist_features, *distance_to_closest_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
+                standard_norm = np.clip([*dist_features, *speed_features, *turn_features, *veh_dist_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
+                obs[veh.id] = np.concatenate([standard_norm, distance_to_closest_features])
             else: 
                 obs[veh.id] = np.clip([*dist_features, *speed_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low 
         sort_id = lambda d: [v for k, v in sorted(d.items())]
@@ -349,15 +356,15 @@ class GridEnv(Env):
                         if veh.id in penalty_rls:
                             in_reward -= current_collision_coef / len(penalty_rls)
                 else: # if vehicle is still in the grid
-                    leader_veh = ts.tc.vehicle.getLeader(veh.id, dist=50.0)
-                    if leader_veh is None:
-                        leader_veh = None, 100.0
-                    leader_veh_distance = leader_veh[1]    
-                    # Add stall penalty if moving too slow or too close to vehicle ahead
-                    if veh.speed < 1.0 and leader_veh_distance > 1.5:
+                    # closesest_threat_distance = self.get_closest_threat(veh)
+                    if veh.id in list(distance_to_closest_dict.keys()):
+                        closesest_threat_distance = distance_to_closest_dict[veh.id]
+                    else:
+                        closesest_threat_distance = max_dist
+                    if veh.speed < 1.0 and closesest_threat_distance > 2:
                         in_reward -= 0.05
                     # Add reward for high speed if the street is empty ahead
-                    if leader_veh_distance > 10.0:
+                    if closesest_threat_distance > 10.0:
                         in_reward += veh.speed / max_speed * 0.1
                     # Always punish the agents in the grid to encourage faster clearing
                     in_reward -= 0.01
@@ -370,6 +377,92 @@ class GridEnv(Env):
         else:
             reward = len(ts.new_arrived) - c.collision_coef * len(ts.new_collided)
             return Namespace(obs=obs, id=ids, reward=reward)
+        # Process the close vehicles
+    def process_close_vehicles(self, ego_veh, context_results):
+        # 1. IDENTIFY MISSING VEHICLES
+        # We only want to process vehicles we haven't calculated yet this step
+        missing_ids = []
+        missing_data = []
+
+        # Always ensure Ego is in the loop (if not in cache)
+        if ego_veh.id not in self.veh_data_cache:
+            # Manually construct data dict for Ego to match SUMO format
+            ego_data = {
+                66: np.array(ego_veh.position), # VAR_POSITION
+                67: ego_veh.angle,              # VAR_ANGLE
+                68: ego_veh.length,             # VAR_LENGTH
+                77: 1.8                         # VAR_WIDTH
+            }
+            missing_ids.append(ego_veh.id)
+            missing_data.append(ego_data)
+
+        # Check neighbors
+        for v_id, data in context_results.items():
+            if v_id not in self.veh_data_cache:
+                missing_ids.append(v_id)
+                missing_data.append(data)
+
+        # 2. BATCH PROCESS MISSING VEHICLES (Heavy Math happens here, ONCE)
+        if len(missing_ids) > 0:
+            # Extract data columns
+            pos_list = [d[66] for d in missing_data]
+            ang_list = [d[67] for d in missing_data]
+            len_list = [d.get(68, 5.0) for d in missing_data]
+            wid_list = [d.get(77, 1.8) for d in missing_data]
+
+            pos_arr = np.array(pos_list)
+            ang_arr = np.array(ang_list)
+            l_arr = np.array(len_list)
+            w_arr = np.array(wid_list)
+            w_2 = w_arr / 2
+
+            # --- Vectorized Box Calculation (Your Logic) ---
+            theta = np.radians(90 - ang_arr)
+            c, s = np.cos(theta), np.sin(theta)
+            R = np.array([[c, -s], [s, c]]).transpose(2, 0, 1)
+
+            # Corners relative to Nose (0,0)
+            # Front-Left, Front-Right, Rear-Right, Rear-Left
+            corners_local = np.stack([
+                np.stack([np.zeros_like(l_arr), w_2], axis=-1),
+                np.stack([np.zeros_like(l_arr), -w_2], axis=-1),
+                np.stack([-l_arr, -w_2], axis=-1),
+                np.stack([-l_arr, w_2], axis=-1)
+            ], axis=1)
+
+            corners_rotated = np.einsum('nij,nkj->nki', R, corners_local)
+            corners_global = corners_rotated + pos_arr[:, np.newaxis, :]
+            
+            # Calculate centers
+            centers = np.mean(corners_global, axis=1)
+
+            # 3. UPDATE CACHE
+            for i, vid in enumerate(missing_ids):
+                # Create the expensive Polygon object HERE, once.
+                box = corners_global[i]
+                poly = Polygon(box)
+                
+                self.veh_data_cache[vid] = {
+                    'id': vid,
+                    'box': box,
+                    'center': centers[i],
+                    'poly': poly,          # Storing the Shapely object
+                    'angle': ang_arr[i]
+                }
+
+        # 4. RETURN DATA FROM CACHE
+        # Now simply gather the pre-calculated objects for requested IDs
+        results = []
+        
+        # Add Ego
+        results.append(self.veh_data_cache[ego_veh.id])
+        
+        # Add Neighbors
+        for v_id in context_results:
+            if v_id in self.veh_data_cache:
+                results.append(self.veh_data_cache[v_id])
+                
+        return results
 
     def append_step_info(self):
         super().append_step_info()
@@ -407,6 +500,63 @@ class GridEnv(Env):
                     if distance < a_dist_threshold:
                         close_rls[rls.id] = distance / a_dist_threshold
         return close_rls
+    # Get the closet threat to ego vehicle
+    def get_closest_threat(self, ego_veh):
+        ts = self.ts
+        context_results = ts.tc.vehicle.getContextSubscriptionResults(ego_veh.id)
+
+        if context_results is None or len(context_results) <= 1:
+            return {ego_veh.id: c.max_dist}
+
+        # 1. Get Cached Data (Very Fast)
+        vehicle_info = self.process_close_vehicles(ego_veh, context_results)
+
+        # 2. Extract Ego Data directly (It's always index 0 or in the list)
+        # Since we cache using ID, we can just look up ego in the cache directly
+        ego_data = self.veh_data_cache[ego_veh.id]
+        ego_poly = ego_data['poly']     # Already a Polygon!
+        ego_center = ego_data['center']
+        ego_angle = ego_data['angle']
+
+        closest_dist = np.inf
+        
+        # Pre-calculate heading vector
+        ego_heading_rad = np.radians(90 - ego_angle)
+        heading_vec = np.array([np.cos(ego_heading_rad), np.sin(ego_heading_rad)])
+
+        # 3. Loop through neighbors
+        for veh in vehicle_info:
+            if veh['id'] == ego_veh.id:
+                continue
+
+            # Fast Shapely distance (Polygon vs Polygon)
+            # Both polygons were created in the previous step, so this is fast
+            dist = ego_poly.distance(veh['poly'])
+
+            if dist < abs(closest_dist): # Check abs in case we have a negative closer
+                # Direction Logic
+                vec_to_closest = veh['center'] - ego_center
+                direction = np.dot(vec_to_closest, heading_vec)
+                
+                # Angle check (using cached angle)
+                angle_dif = abs(ego_angle - veh['angle'])
+                
+                # Filter: Opposite direction AND behind
+                if 170 <= angle_dif <= 190 and direction < 0:
+                    continue
+
+                # Update closest
+                # Note: We compare against raw 'dist' (positive), 
+                # but assign signed value to result
+                if dist < abs(closest_dist): 
+                    if direction < 0:
+                        closest_dist = -dist
+                    else:
+                        closest_dist = dist
+
+        val = float(closest_dist) if abs(closest_dist) < np.inf else c.max_dist
+        return {ego_veh.id: val}
+    
     @property
     def stats(self):
         c = self.c
@@ -513,7 +663,7 @@ if __name__ == '__main__':
         c.directions = ['up', 'right', 'down', 'left']
     if c.chain_lr:
         # Added turn feature to observation  
-        c._n_obs = 6 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
+        c._n_obs = 7 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1))
     else:
         c._n_obs = 2 * (1 + c.obs_tail + (1 + 2 * c.obs_next_cross_platoons) * (len(c.directions) - 1)) 
     
