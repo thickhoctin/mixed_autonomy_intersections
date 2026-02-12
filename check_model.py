@@ -6,7 +6,7 @@ import sys
 def inspect_latest_model():
     # 1. Define the directory (Note the space in 'flow 700x700')
     # Using raw string (r"...") to avoid issues with special characters
-    target_dir = r"results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_11.02/models/flow_700x700"
+    target_dir = r"results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_12.02/models/flow_700x700"
 
     print(f"Searching in: {target_dir}")
 
@@ -67,9 +67,9 @@ def inspect_latest_model():
         print(f"Found {len(transformer_keys)} layers related to Transformers.")
         print("\nSample Transformer Keys found:")
         # Print first 5 and last 5 to give a good overview
-        for k in transformer_keys[:5]:
+        for k in transformer_keys[:]:
             print(f"  • {k}")
-        if len(transformer_keys) > 5:
+        if len(transformer_keys) > 40:
             print("  ... (others omitted) ...")
     else:
         print("⚠️ WARNING: No Transformer layers found.")
