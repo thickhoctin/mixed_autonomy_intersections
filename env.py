@@ -851,14 +851,15 @@ class TrafficState:
             flow.backlog.add(veh_id)
 
         self.new_departed = set()
-        min_gap = 20.0
+        min_gap = 30.0
         for veh_id in sim_res.departed_vehicles_ids:
             # add subscription for the new vehicle and create the vehicle object, but don't update the vehicle's state until after we have all departed vehicles so that we can correctly set the color of all vehicles based on the current state of the environment instead of having the first few vehicles be colored differently before we see any departed vehicles
             tc.vehicle.subscribeContext(
                 veh_id,
                 T.CMD_GET_VEHICLE_VARIABLE,
                 min_gap, 
-                [T.VAR_POSITION, T.VAR_ANGLE, T.VAR_LENGTH, T.VAR_WIDTH],
+                [T.VAR_POSITION, T.VAR_ANGLE, T.VAR_LENGTH, T.VAR_WIDTH, T.VAR_SPEED, T.VAR_ROUTE_ID, T.VAR_TYPE, 
+                 T.VAR_ROAD_ID, T.VAR_LANEPOSITION],
                 begin=0, 
                 end=2147483647 # Max integer (forever)
             )
@@ -872,7 +873,7 @@ class TrafficState:
             length = tc.vehicle.getLength(veh_id)
             self.vehicles[veh_id] = veh = Vehicle(id=veh_id, type=type_, route=route, length=length)
             type_.vehicles.add(veh)
-
+            tc.vehicle.setType(veh_id, type_.id) 
             if c.render:
                 color_fn = c.get('color_fn', lambda veh: RED if 'rl' in type_.id else WHITE)
                 self.set_color(veh, color_fn(veh))
