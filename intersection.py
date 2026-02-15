@@ -225,99 +225,101 @@ class GridEnv(Env):
         veh_default_far = Namespace(speed=0, route_position=-np.inf)
         vehs_default = lambda: [veh_default_close] + [veh_default_far] * 2 * c.obs_next_cross_platoons
         for veh in rl_type.vehicles:
-            route, lane, platoon = veh.route, veh.lane, veh.platoon
-            junction = lane.next_junction
+            if not c.use_attention:
+                route, lane, platoon = veh.route, veh.lane, veh.platoon
+                junction = lane.next_junction
 
-            head, tail = veh, platoon.tail
-            route_vehs = [(route, [head, *lif(c.obs_tail, tail)])]
+                head, tail = veh, platoon.tail
+                route_vehs = [(route, [head, *lif(c.obs_tail, tail)])]
 
-            if junction is ts.sentinel_junction:
-                route_vehs.extend([(None, vehs_default())] * (len(c.directions) - 1))
-            else:
-                # Group crossing lane by direction
-                max_cross_directions = len(c.directions) - 1
-                lanes_by_direction = {}
+                if junction is ts.sentinel_junction:
+                    route_vehs.extend([(None, vehs_default())] * (len(c.directions) - 1))
+                else:
+                    # Group crossing lane by direction
+                    max_cross_directions = len(c.directions) - 1
+                    lanes_by_direction = {}
 
-                for jun_lane in lane.next_junction_lanes:
-                    jun_lane_route = nexti(jun_lane.from_routes)
-                    lane_direction = None
-                    for direction in c.directions:
-                        if direction in jun_lane_route.id:
-                            lane_direction = direction
-                            break
-                    
-                    # Keep the lane for each direction
-                    if lane_direction and lane_direction not in lanes_by_direction:
-                        lanes_by_direction[lane_direction] = jun_lane
-                        if len(lanes_by_direction) >= max_cross_directions:
-                            break
-                for direction in c.directions:
-                    if direction in lanes_by_direction:          
-                    # Defaults for jun_lane
-                        jun_headtails = vehs_default()
-                        jun_lane = lanes_by_direction[direction]
+                    for jun_lane in lane.next_junction_lanes:
                         jun_lane_route = nexti(jun_lane.from_routes)
-                        jun_veh, _ = jun_lane.prev_vehicle(0, route=jun_lane_route)
-                        jun_veh = jun_veh if jun_veh and jun_veh.lane.next_junction is junction else None
+                        lane_direction = None
+                        for direction in c.directions:
+                            if direction in jun_lane_route.id:
+                                lane_direction = direction
+                                break
+                        
+                        # Keep the lane for each direction
+                        if lane_direction and lane_direction not in lanes_by_direction:
+                            lanes_by_direction[lane_direction] = jun_lane
+                            if len(lanes_by_direction) >= max_cross_directions:
+                                break
+                    for direction in c.directions:
+                        if direction in lanes_by_direction:          
+                        # Defaults for jun_lane
+                            jun_headtails = vehs_default()
+                            jun_lane = lanes_by_direction[direction]
+                            jun_lane_route = nexti(jun_lane.from_routes)
+                            jun_veh, _ = jun_lane.prev_vehicle(0, route=jun_lane_route)
+                            jun_veh = jun_veh if jun_veh and jun_veh.lane.next_junction is junction else None
 
-                        if jun_veh:
-                            if jun_veh.type is rl_type:
-                                # If jun_veh is RL or jun_veh is human and there's no RL vehicle in front of it
-                                jun_headtails[1: 3] = jun_veh, jun_veh.platoon.tail
-                                platoon = jun_veh.platoon.prev
-                                for i in 1 + 2 * np.arange(1, c.obs_next_cross_platoons):
-                                    if platoon is None: break
-                                    jun_headtails[i: i + 2] = platoon.head, platoon.tail
-                                    platoon = platoon.prev
-                            else:
-                                # If jun_veh is a human vehicle behind some RL vehicle (in another lane)
-                                jun_headtails[0] = jun_veh.platoon.tail
-                                next_cross_platoon = jun_veh.platoon.prev
-                                if next_cross_platoon:
-                                    jun_headtails[1: 3] = next_cross_platoon.head, next_cross_platoon.tail
-                                    platoon = next_cross_platoon.prev
+                            if jun_veh:
+                                if jun_veh.type is rl_type:
+                                    # If jun_veh is RL or jun_veh is human and there's no RL vehicle in front of it
+                                    jun_headtails[1: 3] = jun_veh, jun_veh.platoon.tail
+                                    platoon = jun_veh.platoon.prev
                                     for i in 1 + 2 * np.arange(1, c.obs_next_cross_platoons):
                                         if platoon is None: break
                                         jun_headtails[i: i + 2] = platoon.head, platoon.tail
                                         platoon = platoon.prev
-                        route_vehs.append((jun_lane_route, jun_headtails))
-            # Build observation
-            ego_pos = np.array(veh.position)
-            dist_features, speed_features, turn_features, veh_dist_features, distance_to_closest_features = [], [], [], [], []
-            for route, vehs in route_vehs:
-                j_pos = junction.route_position[route]                
-                for v in vehs:
-                    if not math.isinf(v.route_position):
-                        v_pos = np.array(v.position)
-                        # Distance feature
-                        dist = np.linalg.norm(v_pos - ego_pos) / max_dist
-                        veh_dist_features.extend([np.clip(dist, 0, 1)])
-                    else:
-                        veh_dist_features.extend([1.0])
-                    # Turn feature
-                    # Change from linear to one-hot encoding for left/right/straight
-                    if math.isinf(v.route_position):
-                        turn_features.extend([0, 0, 0])
-                        distance_to_closest_features.extend([1.0])                               
-                        continue
-                    if 'left' in v.route.id:
-                        turn_features.extend([1, 0, 0])
-                    elif 'right' in v.route.id:
-                        turn_features.extend([0, 0, 1])
-                    else:
-                        turn_features.extend([0, 1, 0])
-                    # Add distance to leader for ego vehicle
-                    distance_to_closest = self.get_closest_threat(v)                    
-                    distance_to_closest_features.extend([float(next(iter(distance_to_closest.values()))) / max_dist])
-                    distance_to_closest_dict.update(distance_to_closest)
-                dist_features.extend([0 if j_pos == v.route_position else (j_pos - v.route_position) / max_dist for v in vehs])
-                speed_features.extend([v.speed / max_speed for v in vehs])
-            if c.chain_lr:
-                # obs[veh.id] = np.clip([*dist_features, *speed_features, *turn_features, *veh_dist_features, *distance_to_closest_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
-                standard_norm = np.clip([*dist_features, *speed_features, *turn_features, *veh_dist_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
-                obs[veh.id] = np.concatenate([standard_norm, distance_to_closest_features])
-            else: 
-                obs[veh.id] = np.clip([*dist_features, *speed_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low 
+                                else:
+                                    # If jun_veh is a human vehicle behind some RL vehicle (in another lane)
+                                    jun_headtails[0] = jun_veh.platoon.tail
+                                    next_cross_platoon = jun_veh.platoon.prev
+                                    if next_cross_platoon:
+                                        jun_headtails[1: 3] = next_cross_platoon.head, next_cross_platoon.tail
+                                        platoon = next_cross_platoon.prev
+                                        for i in 1 + 2 * np.arange(1, c.obs_next_cross_platoons):
+                                            if platoon is None: break
+                                            jun_headtails[i: i + 2] = platoon.head, platoon.tail
+                                            platoon = platoon.prev
+                            route_vehs.append((jun_lane_route, jun_headtails))
+                # Build observation
+                ego_pos = np.array(veh.position)
+                dist_features, speed_features, turn_features, veh_dist_features, distance_to_closest_features = [], [], [], [], []
+                for route, vehs in route_vehs:
+                    j_pos = junction.route_position[route]                
+                    for v in vehs:
+                        if not math.isinf(v.route_position):
+                            v_pos = np.array(v.position)
+                            # Distance feature
+                            dist = np.linalg.norm(v_pos - ego_pos) / max_dist
+                            veh_dist_features.extend([np.clip(dist, 0, 1)])
+                        else:
+                            veh_dist_features.extend([1.0])
+                        # Turn feature
+                        # Change from linear to one-hot encoding for left/right/straight
+                        if math.isinf(v.route_position):
+                            turn_features.extend([0, 0, 0])
+                            distance_to_closest_features.extend([1.0])                               
+                            continue
+                        if 'left' in v.route.id:
+                            turn_features.extend([1, 0, 0])
+                        elif 'right' in v.route.id:
+                            turn_features.extend([0, 0, 1])
+                        else:
+                            turn_features.extend([0, 1, 0])
+                        # Add distance to leader for ego vehicle
+                        distance_to_closest = self.get_knn_observation(v)                    
+                        
+                    dist_features.extend([0 if j_pos == v.route_position else (j_pos - v.route_position) / max_dist for v in vehs])
+                    speed_features.extend([v.speed / max_speed for v in vehs])
+                if c.chain_lr:
+                    obs[veh.id] = np.clip([*dist_features, *speed_features, *turn_features, *veh_dist_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
+                    # standard_norm = np.clip([*dist_features, *speed_features, *turn_features, *veh_dist_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low
+                    # obs[veh.id] = np.concatenate([standard_norm, distance_to_closest_features])
+                else: 
+                    obs[veh.id] = np.clip([*dist_features, *speed_features], 0, 1).astype(np.float32) * (1 - c.low) + c.low 
+            else:
+                obs.update(self.get_knn_observation(veh))                
         sort_id = lambda d: [v for k, v in sorted(d.items())]
         ids = sorted(obs)
         obs = arrayf(sort_id(obs)).reshape(-1, c._n_obs)
@@ -356,20 +358,19 @@ class GridEnv(Env):
                         if veh.id in penalty_rls:
                             in_reward -= current_collision_coef / len(penalty_rls)
                 else: # if vehicle is still in the grid
-                    # closesest_threat_distance = self.get_closest_threat(veh)
-                    if veh.id in list(distance_to_closest_dict.keys()):
-                        closesest_threat_distance = distance_to_closest_dict[veh.id]
-                    else:
-                        closesest_threat_distance = max_dist
+                    # closesest_threat_distance = self.get_closest_threat(veh)                    
+                    closesest_threat_distance = abs(self.get_knn_observation(veh)[veh.id][7] * c.max_dist)                    
+                    if closesest_threat_distance > c.max_dist:
+                        closesest_threat_distance = c.max_dist
                     if veh.speed < 1.0 and closesest_threat_distance > 2:
-                        in_reward -= 0.05
+                        in_reward -= 0.1
                     # Add reward for high speed if the street is empty ahead
                     if closesest_threat_distance > 10.0:
-                        in_reward += veh.speed / max_speed * 0.1
+                        in_reward += veh.speed / max_speed * 0.5
                     # Always punish the agents in the grid to encourage faster clearing
-                    in_reward -= 0.01
+                    in_reward -= 0.1
                 # Add the global reward portion for each RL vehicle
-                in_reward += global_reward / len(prev_rls) if len(prev_rls) else 0 
+                in_reward += len(ts.new_arrived) / len(prev_rls) if len(prev_rls) else 0 
                 reward[veh.id] = in_reward
             # Sort and convert to arrays
             reward = arrayf(sort_id(reward))
@@ -379,6 +380,8 @@ class GridEnv(Env):
             return Namespace(obs=obs, id=ids, reward=reward)
         # Process the close vehicles
     def process_close_vehicles(self, ego_veh, context_results):
+        ts = self.ts
+        c = self.c
         # 1. IDENTIFY MISSING VEHICLES
         # We only want to process vehicles we haven't calculated yet this step
         missing_ids = []
@@ -391,7 +394,12 @@ class GridEnv(Env):
                 66: np.array(ego_veh.position), # VAR_POSITION
                 67: ego_veh.angle,              # VAR_ANGLE
                 68: ego_veh.length,             # VAR_LENGTH
-                77: 1.8                         # VAR_WIDTH
+                77: 1.8,
+                64: ego_veh.speed,                         # VAR_SPEED
+                83: ego_veh.route.id if ego_veh.route else '', # VAR_ROUTE_ID
+                79: ego_veh.type if ego_veh.type else '', # VAR_TYPE
+                80: ego_veh.edge.id if ego_veh.edge else '', # VAR_ROAD_ID
+                86: ego_veh.laneposition if ego_veh.lane else 0, # VAR_LANEPOSITION
             }
             missing_ids.append(ego_veh.id)
             missing_data.append(ego_data)
@@ -402,24 +410,34 @@ class GridEnv(Env):
                 missing_ids.append(v_id)
                 missing_data.append(data)
 
-        # 2. BATCH PROCESS MISSING VEHICLES (Heavy Math happens here, ONCE)
+        # 2. BATCH PROCESS MISSING VEHICLES 
         if len(missing_ids) > 0:
             # Extract data columns
             pos_list = [d[66] for d in missing_data]
             ang_list = [d[67] for d in missing_data]
             len_list = [d.get(68, 5.0) for d in missing_data]
             wid_list = [d.get(77, 1.8) for d in missing_data]
+            speed_list = [d.get(64, 0.0) for d in missing_data]
+            route_list = [d.get(83, '') for d in missing_data]
+            type_list = [d.get(79, 'Generic') for d in missing_data]
+            road_list = [d.get(80, '') for d in missing_data]
+            lane_pos_list = [d.get(86, 0.0) for d in missing_data]
 
             pos_arr = np.array(pos_list)
             ang_arr = np.array(ang_list)
             l_arr = np.array(len_list)
             w_arr = np.array(wid_list)
             w_2 = w_arr / 2
+            speed_arr = np.array(speed_list)
+            route_arr = np.array(route_list)
+            type_arr = np.array(type_list)
+            lanepos_arr = np.array(lane_pos_list)
+            road_id_arr = np.array(road_list)
 
             # --- Vectorized Box Calculation (Your Logic) ---
             theta = np.radians(90 - ang_arr)
-            c, s = np.cos(theta), np.sin(theta)
-            R = np.array([[c, -s], [s, c]]).transpose(2, 0, 1)
+            co, si = np.cos(theta), np.sin(theta)
+            R = np.array([[co, -si], [si, co]]).transpose(2, 0, 1)
 
             # Corners relative to Nose (0,0)
             # Front-Left, Front-Right, Rear-Right, Rear-Left
@@ -435,7 +453,34 @@ class GridEnv(Env):
             
             # Calculate centers
             centers = np.mean(corners_global, axis=1)
-
+            dist_to_junction_arr = np.zeros(len(missing_ids))
+            norm_angle_arr = np.zeros(len(missing_ids))
+            
+            for i in range(len(missing_ids)):
+                # Distance to junction calculation
+                road_id = road_id_arr[i]
+                laneposition = lanepos_arr[i]
+                route_id = route_arr[i]
+                
+                if road_id and road_id in ts.edges and route_id and route_id in ts.routes:
+                    edge = ts.edges[road_id]
+                    route = ts.routes[route_id]
+                    lane = edge.lanes[0] if edge.lanes else None
+                    
+                    if lane:
+                        junction = lane.next_junction
+                        # Calculate route position
+                        edge_route_position = edge.route_position.get(route, 0)
+                        vehicle_route_position = edge_route_position + laneposition
+                        
+                        if hasattr(junction, 'route_position') and route in junction.route_position:
+                            j_pos = junction.route_position[route]
+                            dist_to_junction = (j_pos - vehicle_route_position) / c.max_dist
+                            dist_to_junction_arr[i] = np.clip(dist_to_junction, -1.0, 1.0)
+                
+                # Normalize angle from [0, 360] to [-1, 1]
+                norm_angle_arr[i] = (ang_arr[i] / 180.0) - 1.0
+            
             # 3. UPDATE CACHE
             for i, vid in enumerate(missing_ids):
                 # Create the expensive Polygon object HERE, once.
@@ -444,21 +489,24 @@ class GridEnv(Env):
                 
                 self.veh_data_cache[vid] = {
                     'id': vid,
-                    'box': box,
+                    # 'box': box,
                     'center': centers[i],
                     'poly': poly,          # Storing the Shapely object
-                    'angle': ang_arr[i]
+                    'angle': ang_arr[i],
+                    'speed': speed_arr[i],
+                    'route': route_arr[i],
+                    'type': type_arr[i],
+                    # 'road': road_id_arr[i],
+                    # 'lane_position': lanepos_arr[i],
+                    'dist_to_junction': dist_to_junction_arr[i],
+                    'norm_angle': norm_angle_arr[i],
                 }
 
         # 4. RETURN DATA FROM CACHE
         # Now simply gather the pre-calculated objects for requested IDs
         results = []
-        
-        # Add Ego
-        results.append(self.veh_data_cache[ego_veh.id])
-        
-        # Add Neighbors
-        for v_id in context_results:
+        all_ids = set([ego_veh.id] + list(context_results.keys()))
+        for v_id in all_ids:
             if v_id in self.veh_data_cache:
                 results.append(self.veh_data_cache[v_id])
                 
@@ -501,12 +549,13 @@ class GridEnv(Env):
                         close_rls[rls.id] = distance / a_dist_threshold
         return close_rls
     # Get the closet threat to ego vehicle
-    def get_closest_threat(self, ego_veh):
+    def get_knn_observation(self, ego_veh):
         ts = self.ts
+        c = self.c
         context_results = ts.tc.vehicle.getContextSubscriptionResults(ego_veh.id)
 
         if context_results is None or len(context_results) <= 1:
-            return {ego_veh.id: c.max_dist}
+            context_results = {}
 
         # 1. Get Cached Data (Very Fast)
         vehicle_info = self.process_close_vehicles(ego_veh, context_results)
@@ -516,21 +565,32 @@ class GridEnv(Env):
         ego_data = self.veh_data_cache[ego_veh.id]
         ego_poly = ego_data['poly']     # Already a Polygon!
         ego_center = ego_data['center']
-        ego_angle = ego_data['angle']
-
+        
+        # Normalize ego speed
+        norm_ego_speed = ego_data['speed'] / c.max_speed
+        
+        # Ego turn feature
+        ego_turn_feat = [0, 1, 0]  # Default straight
+        if 'left' in ego_data['route']:
+            ego_turn_feat = [1, 0, 0]
+        elif 'right' in ego_data['route']:
+            ego_turn_feat = [0, 0, 1]
+        ego_norm_angle = ego_data['norm_angle']  # Already normalized to [-1, 1]
+        ego_dist_to_junc =ego_data['dist_to_junction']
+        # Ego always has distance 0 to itself
+        ego_features = [0.0, norm_ego_speed, *ego_turn_feat, ego_norm_angle, ego_dist_to_junc]
+        
         closest_dist = np.inf
         
         # Pre-calculate heading vector
-        ego_heading_rad = np.radians(90 - ego_angle)
+        ego_heading_rad = np.radians(90 - ego_veh.angle)
         heading_vec = np.array([np.cos(ego_heading_rad), np.sin(ego_heading_rad)])
-
+        candiates = []
         # 3. Loop through neighbors
         for veh in vehicle_info:
             if veh['id'] == ego_veh.id:
                 continue
 
-            # Fast Shapely distance (Polygon vs Polygon)
-            # Both polygons were created in the previous step, so this is fast
             dist = ego_poly.distance(veh['poly'])
 
             if dist < abs(closest_dist): # Check abs in case we have a negative closer
@@ -539,10 +599,11 @@ class GridEnv(Env):
                 direction = np.dot(vec_to_closest, heading_vec)
                 
                 # Angle check (using cached angle)
-                angle_dif = abs(ego_angle - veh['angle'])
+                angle_dif = abs(ego_veh.angle - veh['angle'])
                 
                 # Filter: Opposite direction AND behind
                 if 170 <= angle_dif <= 190 and direction < 0:
+                    closest_dist = c.max_dist  # Treat opposite direction behind as infinitely far
                     continue
 
                 # Update closest
@@ -553,9 +614,37 @@ class GridEnv(Env):
                         closest_dist = -dist
                     else:
                         closest_dist = dist
+                
+                # Normalize
+                norm_dist = np.clip(closest_dist / c.max_dist, -1.0, 1.0)
+                norm_speed = np.clip(veh['speed'] / c.max_speed * (1 - c.low) + c.low, -1.0, 1.0) # Scale speed to [-1, 1]
 
-        val = float(closest_dist) if abs(closest_dist) < np.inf else c.max_dist
-        return {ego_veh.id: val}
+                # Turn infomation
+                turn_feat = [0,1,0] # Default straight
+                if 'left' in veh['route']:
+                    turn_feat = [1,0,0]
+                elif 'right' in veh['route']:
+                    turn_feat = [0,0,1]
+                # Distance to junction for this neighbor
+                neighbor_dist_to_junction = veh['dist_to_junction']
+                neighbor_norm_angle = veh['norm_angle']
+                candiates.append({
+                    'id': veh['id'],
+                    'features': [norm_dist, norm_speed, *turn_feat, neighbor_dist_to_junction, neighbor_norm_angle]
+                    })
+        # Sort KNN
+        candiates.sort(key=lambda x: abs(x['features'][0]))  # Sort by absolute distance
+        k_nearest = candiates[:10] # top 11 closest include ego
+        obs_list = ego_features.copy()
+        for item in k_nearest:
+            obs_list.extend(item['features'])
+        padding_count = 10 - len(k_nearest)
+        padding_feat = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0] # Default for missing: far away, zero speed, straight
+
+        for _ in range(padding_count):
+            obs_list.extend(padding_feat)
+        return {ego_veh.id: obs_list}
+
     
     @property
     def stats(self):
