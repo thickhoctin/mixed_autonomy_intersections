@@ -403,27 +403,10 @@ class AttentionFFN(nn.Module):
     def forward(self, inp, value=False, policy=False, argmax=None):
         # inp shape: [Batch_Size, 77]
         # .view(-1, 11, N) means: Keep Batch size (-1), 11 Vehicles, N features per vehicle.
-        
-        # 1. Intersection Distance (Indices 0-11)
-        f_inter_dist = inp[:, 0:11].view(-1, 11, 1)
-        
-        # 2. Speed (Indices 11-22)
-        f_speed      = inp[:, 11:22].view(-1, 11, 1)
-        
-        # 3. Turn Signal (Indices 22-55) -> 3 features per vehicle!
-        f_turn       = inp[:, 22:55].view(-1, 11, 3)
-        
-        # 4. Platoon Distance (Indices 55-66)
-        f_platoon    = inp[:, 55:66].view(-1, 11, 1)
-        
-        # 5. Closest Threat (Indices 66-77) -> This is the NEW one
-        f_threat     = inp[:, 66:77].view(-1, 11, 1)
-        f_threat_norm = torch.clamp(f_threat, -1.0, 1.0)
-        src_key_padding_mask = (f_turn.max(dim=2).values == -1)
+        x = inp.view(-1, self.num_vehicle_obs, self.agent_input_dim)
+        f_turn = x[:, :, 2:5]
+        src_key_padding_mask = (f_turn.abs().sum(dim=2) == 0)
         src_key_padding_mask[:, 0] = False
-        # stack
-        x = torch.cat([f_inter_dist, f_speed, f_turn, f_platoon, f_threat_norm], dim=2)
-
         # Embedding
         x_embed = self.embedding(x)  # (batch_size, num_vehicles, embed_dim)
         with torch.nn.attention.sdpa_kernel([torch.nn.attention.SDPBackend.MATH]):
