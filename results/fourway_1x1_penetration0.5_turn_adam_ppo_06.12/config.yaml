@@ -1,0 +1,34 @@
+# Test configuration for four-way intersection with 50% penetration rate
+av_frac: 0.5 # 50% autonomous vehicles
+directions: 4way 
+n_cols: 1 # 1x1 grid
+n_rows: 1
+n_workers: 1
+opt: Adam # Optimizer
+alg: PPO # Proximal Policy Optimization
+chain_lr: True # Enable left and right turn 
+use_ray: False # Disable Ray 
+pclip: 0.2 # Standard PPO clipping 0.2
+entcoef: 0.01 # Maintain some exploration
+lr: 0.001 # Increase learning rate
+vcoef: 1 # Value function coefficient
+collision_coef: 20.0 # Collision penalty coefficient
+n_rollouts_per_step: 24 # Number of rollouts per training step
+layers: 
+  - 192
+  - leaky_relu
+  - 128
+  - leaky_relu
+use_poisson: True # Enable Poisson flow
+adv_norm: False # Disable advantage normalization
+load_step: 160 # Load from step 0
+# Increase flow rates for four-way intersection from 700 to 850
+worker_kwargs:
+- flow_rate_h: 700
+  flow_rate_v: 700
+# Change gradient decents steps for each batch from 20 to 15 
+n_gds: 15 # Change from 20 to 15
+
+# Change from 06.12:
+# Change action space from continuous to discrete with 5 actions
+n_actions: 5 # Change from 3 to 5 discrete actions

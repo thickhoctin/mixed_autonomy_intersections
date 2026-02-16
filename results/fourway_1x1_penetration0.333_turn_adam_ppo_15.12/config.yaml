@@ -1,0 +1,64 @@
+# Test configuration for four-way intersection with 50% penetration rate
+directions: 4way 
+n_cols: 1 # 1x1 grid
+n_rows: 1
+opt: Adam # Optimizer
+alg: PPO # Proximal Policy Optimization
+chain_lr: True # Enable left and right turn 
+pclip: 0.2 # Standard PPO clipping 0.2
+lr: 0.001 # Increase learning rate
+vcoef: 1 # Value function coefficient
+n_rollouts_per_step: 40 # Number of rollouts per training step
+layers: 
+  - 192
+  - leaky_relu
+  - 128
+  - leaky_relu
+  - 64
+  - leaky_relu
+  - 32
+  - leaky_relu
+use_poisson: True # Enable Poisson flow
+adv_norm: False # Disable advantage normalization
+load_step: 0 # Load from step 0
+# Increase flow rates for four-way intersection from 700 to 850
+worker_kwargs:
+worker_kwargs:
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+# Change action space from continuous to discrete with 5 actions
+n_actions: 5 # Change from 3 to 5 discrete actions
+# Increase collision coefficient from 20.0 to 50.0
+lam: 0.95 # GAE lambda
+n_gds: 20 # Gradient descent steps per batch
+vclip: 0.5 # Value function clipping
+use_ray: True # Enable Ray 
+n_workers: 8 # Number of parallel workers
+use_critic: True # Enable critic on workers
+kltarg : 0.005 # KL target
+entcoef: 0.003 # Entropy coefficient to try to improve exploration
+
+
+# Increase penalty for collision back to 50
+collision_coef: 40.0 # Collision penalty coefficient
+# Add distance to vehicles as observation feature
+n_rollouts_per_step: 32 # Number of rollouts per training step
+# Added growth factor for collision penalty
+collision_penalty_growth: 1.2 # Growth factor for collision penalty
+
+# Change from 15.12:
+av_frac: 0.333 # Change penetration rate to 33.3%

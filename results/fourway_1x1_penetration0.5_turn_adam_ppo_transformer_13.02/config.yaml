@@ -1,0 +1,58 @@
+# Test configuration for four-way intersection with 50% penetration rate
+directions: 4way 
+n_cols: 1 # 1x1 grid
+n_rows: 1
+opt: Adam # Optimizer
+alg: PPO # Proximal Policy Optimization
+chain_lr: True # Enable left and right turn 
+pclip: 0.2 # Standard PPO clipping 0.2
+vcoef: 1 # Value function coefficient
+n_rollouts_per_step: 32 # Number of rollouts per training step
+use_poisson: True # Enable Poisson flow
+adv_norm: True # Enable advantage normalization
+load_step: 0 # Load from step 0
+worker_kwargs:
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+- flow_rate_h: 700
+  flow_rate_v: 700
+# Change action space from continuous to discrete with 5 actions
+n_actions: 5 # Change from 3 to 5 discrete actions
+# Increase collision coefficient from 20.0 to 50.0
+lam: 0.95 # GAE lambda
+n_gds: 10 # Gradient descent steps per batch
+vclip: 0.5 # Value function clipping
+use_ray: True # Enable Ray 
+n_workers: 8 # Number of parallel workers
+use_critic: True # Enable critic on workers
+kltarg : 0.02 # KL target
+# Increase penalty for collision back to 50
+collision_coef: 5.0 # Collision penalty coefficient
+# Added growth factor for collision penalty
+collision_penalty_growth: 1.0 # Growth factor for collision penalty
+av_frac: 0.5 
+lr: 0.0003 # Decrease learning rate
+use_attention: True
+norm_reward: False
+normclip: 0.5
+entcoef: 0.01 # Entropy coefficient to try to improve exploration
+klcoef: 0.0
+# Change from 1.02. Update the transformer logic.
+layers:
+- 128
+- 'leaky_relu'
+- 128
+- 'leaky_relu'
+center_reward: False

@@ -1,0 +1,2 @@
+step,rollout_time,horizon,speed,speed_rl,speed_rl_std,speed_human,inflow,outflow,inflow_hourly,outflow_hourly,collisions,collisions_human,fuel,backlog_step,n_total_veh_step,flow_horizontal,flow_vertical,raw_reward_mean,raw_reward_sum,reward_mean,reward_sum,n_veh_step_mean,n_veh_step_sum,n_veh_unique
+1,4070.3077807426453,2000.0,5.6171366939312914,5.450750793104491,4.261598942932998,5.793990634815872,877.0,878.0,3157.2,3160.8,0.0,0.0,1852199.1594411791,50.554,82.7695,700.0,1000.0,0.4364,1091.0,0.006888281751286844,17.22070437821711,16.5092,41273.0,561.0

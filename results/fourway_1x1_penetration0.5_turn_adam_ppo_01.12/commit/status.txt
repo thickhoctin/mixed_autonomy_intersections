@@ -1,0 +1,36 @@
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .vscode/launch.json
+	modified:   exp.py
+	modified:   intersection.py
+	modified:   launch_eval.sh
+	modified:   launch_train.sh
+	modified:   results/fourway_1x1_penetration0.5/config.yaml
+	modified:   results/fourway_1x1_penetration0.5/eval_results/e170_skip500_flow550x850.csv
+	modified:   results/fourway_1x1_penetration0.5/sumo/add.xml
+	modified:   results/fourway_1x1_penetration0.5/sumo/con.xml
+	modified:   results/fourway_1x1_penetration0.5/sumo/net.xml
+	modified:   results/fourway_1x1_penetration0.5/train_results.csv
+	modified:   results/twoway_2x1_penetration0.333/sumo/add.xml
+	modified:   results/twoway_2x1_penetration0.333/sumo/con.xml
+	modified:   results/twoway_2x1_penetration0.333/sumo/edg.xml
+	modified:   results/twoway_2x1_penetration0.333/sumo/net.xml
+	modified:   results/twoway_2x1_penetration0.333/sumo/nod.xml
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	EXP_DIR/
+	launch_baseline.sh
+	model_parameters.py
+	test/
+	training_plot.ipynb
+	training_plot_compare_2911.ipynb
+	training_plot_old.ipynb
+	training_progress.png
+	write_to_csv.py
+
+no changes added to commit (use "git add" and/or "git commit -a")

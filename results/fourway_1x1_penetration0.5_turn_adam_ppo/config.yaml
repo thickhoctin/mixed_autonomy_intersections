@@ -1,0 +1,15 @@
+av_frac: 0.5
+directions: 4way
+n_cols: 1
+n_rollouts_per_step: 16
+n_rows: 1
+n_workers: 1
+opt: Adam
+alg: PPO
+g_nds: 20
+chain_lr: True
+use_ray: False
+load_step: 100
+worker_kwargs:
+- flow_rate_h: 700
+  flow_rate_v: 700

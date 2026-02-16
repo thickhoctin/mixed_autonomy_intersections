@@ -1,0 +1,2 @@
+step,rollout_time,horizon,speed,speed_rl,speed_rl_std,speed_human,inflow,outflow,inflow_hourly,outflow_hourly,collisions,collisions_human,fuel,backlog_step,n_total_veh_step,flow_horizontal,flow_vertical
+1,30.225934267044067,2000.0,2.0632396454841575,,,2.063239645484158,517.0,498.0,1861.2,1792.8,18.0,18.0,1563288.852865637,15896.1915,15946.433500000001,700.0,700.0

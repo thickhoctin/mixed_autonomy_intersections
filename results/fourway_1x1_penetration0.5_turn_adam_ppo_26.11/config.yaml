@@ -1,0 +1,28 @@
+av_frac: 0.5 # 50% autonomous vehicles
+directions: 4way 
+n_cols: 1 # 1x1 grid
+n_rows: 1
+n_rollouts_per_step: 16 # Number of rollouts per training step
+n_workers: 1
+opt: Adam # Optimizer
+alg: PPO # Proximal Policy Optimization
+n_gds: 20 # Change from 20 to 10
+load_step: 0 # Start training from scratch 
+chain_lr: True # Enable left and right turn 
+use_ray: False # Disable Ray 
+worker_kwargs:
+- flow_rate_h: 700
+  flow_rate_v: 700
+
+# Change from 26.11:
+pclip: 0.2 # Standard PPO clipping 0.2
+adv_norm: False # Enable advantage normalization
+entcoef: 0.01 # Maintain some exploration
+lr: 0.001 # Increase learning rate
+# kltarg: None # Disable KL target
+# klcoef: 0.01 # Initial KL coefficient
+vcoef: 0.5 # Value function coefficient
+collision_coef: 10.0 # Collision penalty coefficient
+
+# Load step
+load_step: 65

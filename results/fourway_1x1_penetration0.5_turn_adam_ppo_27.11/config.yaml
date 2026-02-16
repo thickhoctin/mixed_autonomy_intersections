@@ -1,0 +1,41 @@
+av_frac: 0.5 # 50% autonomous vehicles
+directions: 4way 
+n_cols: 1 # 1x1 grid
+n_rows: 1
+n_workers: 1
+opt: Adam # Optimizer
+alg: PPO # Proximal Policy Optimization
+n_gds: 20 # Change from 20 to 10
+load_step: 0 # Start training from scratch 
+chain_lr: True # Enable left and right turn 
+use_ray: False # Disable Ray 
+worker_kwargs:
+- flow_rate_h: 700
+  flow_rate_v: 700
+
+
+pclip: 0.2 # Standard PPO clipping 0.2
+adv_norm: False # Enable advantage normalization
+entcoef: 0.01 # Maintain some exploration
+lr: 0.001 # Increase learning rate
+vcoef: 0.5 # Value function coefficient
+collision_coef: 10.0 # Collision penalty coefficient
+
+# Load step
+
+
+# Change from 27.11:
+# Observed more rollouts before each training step help stabilize training
+n_rollouts_per_step: 24 # Number of rollouts per training step
+# Change network architecture from (64, 64) to (128, 128) to increase model capacity
+layers: 
+  - 128
+  - leaky_relu
+  - 128
+  - leaky_relu
+
+# Add Poisson vehicle flow
+# https://sumo.dlr.de/docs/Simulation/Randomness.html
+use_poisson: True # Enable Poisson flow
+adv_norm: False # Disable advantage normalization
+load_step: 110 # Load from step 110

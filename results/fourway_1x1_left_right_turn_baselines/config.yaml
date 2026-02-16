@@ -1,0 +1,15 @@
+av_frac: 0
+flow_rate_h: 700
+flow_rate_v: 700
+n_rollouts_per_step: 1
+n_steps: 3
+priority: horizontal
+result_save: results/fourway_1x1_left_right_turn_baselines/eval_results/skip500_hpriority_flow700x700.csv
+skip_stat_steps: 500
+speed_mode: 31
+tb: true
+use_poisson: True
+chain_lr: False
+directions: '4way'
+n_cols: 1 # 1x1 grid
+n_rows: 1
