@@ -39,15 +39,15 @@ n_workers: 8 # Number of parallel workers
 use_critic: True # Enable critic on workers
 kltarg : 0.02 # KL target
 # Increase penalty for collision back to 50
-collision_coef: 5.0 # Collision penalty coefficient
+collision_coef: 30.0 # Collision penalty coefficient
 # Added growth factor for collision penalty
 collision_penalty_growth: 1.0 # Growth factor for collision penalty
 av_frac: 0.5 
-lr: 0.0003 # Decrease learning rate
+lr: 0.0001 # Decrease learning rate
 use_attention: True
 norm_reward: False
 normclip: 0.5
-entcoef: 0.01 # Entropy coefficient to try to improve exploration
+entcoef: 0.02 # Entropy coefficient to try to improve exploration
 klcoef: 0.0
 # Change from 1.02. Update the transformer logic.
 layers:

@@ -1,15 +1,39 @@
 On branch main
-Your branch is ahead of 'origin/main' by 13 commits.
-  (use "git push" to publish your local commits)
+Your branch is up to date with 'origin/main'.
 
 Changes not staged for commit:
-  (use "git add <file>..." to update what will be committed)
+  (use "git add/rm <file>..." to update what will be committed)
   (use "git restore <file>..." to discard changes in working directory)
-	modified:   .vscode/launch.json
-	modified:   env.py
 	modified:   intersection.py
 	modified:   launch_train.sh
+	modified:   results/fourway_1x1_penetration0.5_test/commit/diff.txt
+	modified:   results/fourway_1x1_penetration0.5_test/commit/hash.txt
+	modified:   results/fourway_1x1_penetration0.5_test/commit/status.txt
+	modified:   results/fourway_1x1_penetration0.5_test/sumo/net.xml
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/commit/diff.txt
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/commit/hash.txt
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/commit/status.txt
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/config.yaml
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771020908.Thanh-Tung.206612.0
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771021838.Thanh-Tung.213078.0
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771063360.Thanh-Tung.1334.0
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771063914.Thanh-Tung.6022.0
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771085487.Thanh-Tung.127238.0
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771097832.Thanh-Tung.197754.0
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771097878.Thanh-Tung.199248.0
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771098997.Thanh-Tung.205702.0
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771109963.Thanh-Tung.244854.0
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771157589.Thanh-Tung.1873.0
+	deleted:    results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/events.out.tfevents.1771158151.Thanh-Tung.5000.0
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/sumo/0/net.xml
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/sumo/1/net.xml
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/sumo/2/net.xml
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/sumo/3/net.xml
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/sumo/4/net.xml
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/sumo/5/net.xml
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/sumo/6/net.xml
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/sumo/7/net.xml
+	modified:   results/fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02/train_results.csv
 	modified:   training_plot.ipynb
-	modified:   ut.py
 
 no changes added to commit (use "git add" and/or "git commit -a")
