@@ -374,17 +374,20 @@ class Main(Config):
 
         c._run_start_time = time()
         c._i = 1
-        for _ in range(c.n_steps):
-            c.rollouts()
-            if c.get('result_save'):
-                c._results.to_csv(c.result_save)
-            if c.get('vehicle_info_save'):
-                c._env.vehicle_info.to_csv(c.vehicle_info_save)
-                c._env.sumo_paths['net'].cp(c.vehicle_info_save.replace('.csv', '.net.xml'))
-            c._i += 1
-            c.log('')
+        with torch.inference_mode():
+            for _ in range(c.n_steps):
+                c.rollouts()
+                if c.get('result_save'):
+                    c._results.to_csv(c.result_save)
+                if c.get('vehicle_info_save'):
+                    c._env.vehicle_info.to_csv(c.vehicle_info_save)
+                    c._env.sumo_paths['net'].cp(c.vehicle_info_save.replace('.csv', '.net.xml'))
+                c._i += 1
+                c.log('')
         if hasattr(c._env, 'close'):
             c._env.close()
+            
+        clear_gpu_memory()
 
     def run(c):
         c.log(format_yaml({k: v for k, v in c.items() if not k.startswith('_')}))
