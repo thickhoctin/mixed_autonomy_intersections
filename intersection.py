@@ -225,7 +225,7 @@ class GridEnv(Env):
         veh_default_far = Namespace(speed=0, route_position=-np.inf)
         vehs_default = lambda: [veh_default_close] + [veh_default_far] * 2 * c.obs_next_cross_platoons
         for veh in rl_type.vehicles:
-            if not c.use_attention:
+            if not c.use_knn_obs:
                 route, lane, platoon = veh.route, veh.lane, veh.platoon
                 junction = lane.next_junction
 
@@ -701,7 +701,7 @@ class GridExp(Main):
 if __name__ == '__main__':
     c = GridExp.from_args(globals(), locals()) # Initialize configuration 
     c.setdefaults(
-        n_steps=500,
+        n_steps=1000,
         step_save=5,
 
         depart_speed=0,
@@ -728,7 +728,7 @@ if __name__ == '__main__':
         n_rows=2,
         n_cols=1,
         speed_mode=SPEED_MODE.obey_safe_speed,
-
+        use_knn_obs=False,
         act_type='accel_discrete',
         low=-1,
 
