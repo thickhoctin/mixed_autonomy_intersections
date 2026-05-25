@@ -35,8 +35,16 @@
     <route refId="r_turn_right_6" probability="0.3333333333333333"/>
     <route refId="r_turn_left_7" probability="0.3333333333333333"/>
   </routeDistribution>
-  <flow id="f_up_0" type="generic" route="dist_up" departSpeed="0" departLane="random" begin="1" end="86400" period="exp( 5.14)"/>
-  <flow id="f_right_0" type="generic" route="dist_right" departSpeed="0" departLane="random" begin="1" end="86400" period="exp( 5.14)"/>
-  <flow id="f_down_0" type="generic" route="dist_down" departSpeed="0" departLane="random" begin="1" end="86400" period="exp( 5.14)"/>
-  <flow id="f_left_0" type="generic" route="dist_left" departSpeed="0" departLane="random" begin="1" end="86400" period="exp( 5.14)"/>
+  <flow id="f_up_0" type="generic" route="dist_up" departSpeed="0" departLane="random" begin="1" end="86400" period="exp( 3.60)"/>
+  <flow id="f_right_0" type="generic" route="dist_right" departSpeed="0" departLane="random" begin="1" end="86400" period="exp( 9.00)"/>
+  <flow id="f_down_0" type="generic" route="dist_down" departSpeed="0" departLane="random" begin="1" end="86400" period="exp( 3.60)"/>
+  <flow id="f_left_0" type="generic" route="dist_left" departSpeed="0" departLane="random" begin="1" end="86400" period="exp( 9.00)"/>
+  <tlLogic id="n_100.100" offset="0.0" type="static" programID="1">
+    <phase duration="1000000" state="gGGrrrgGGrrr"/>
+    <phase duration="3" state="yyyrrryyyrrr"/>
+    <phase duration="3" state="rrrrrrrrrrrr"/>
+    <phase duration="1000000" state="rrrgGGrrrgGG"/>
+    <phase duration="3" state="rrryyyrrryyy"/>
+    <phase duration="3" state="rrrrrrrrrrrr"/>
+  </tlLogic>
 </additional>

@@ -56,3 +56,4 @@ layers:
 - 128
 - 'leaky_relu'
 center_reward: False
+use_knn_obs: True

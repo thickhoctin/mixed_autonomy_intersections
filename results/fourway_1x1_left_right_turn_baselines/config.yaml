@@ -9,7 +9,7 @@ skip_stat_steps: 500
 speed_mode: 31
 tb: true
 use_poisson: True
-chain_lr: False
+chain_lr: True
 directions: '4way'
 n_cols: 1 # 1x1 grid
 n_rows: 1
