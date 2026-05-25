@@ -298,18 +298,26 @@ class GridEnv(Env):
                         # Turn feature
                         # Change from linear to one-hot encoding for left/right/straight
                         if math.isinf(v.route_position):
-                            turn_features.extend([0, 0, 0])
+                            # turn_features.extend([0, 1, 0])
+                            turn_features.extend([0.5])
                             distance_to_closest_features.extend([1.0])                               
                             continue
                         if 'left' in v.route.id:
-                            turn_features.extend([1, 0, 0])
+                            # turn_features.extend([1, 0, 0])
+                            turn_features.extend([0])
                         elif 'right' in v.route.id:
-                            turn_features.extend([0, 0, 1])
+                            # turn_features.extend([0, 0, 1])
+                            turn_features.extend([1])
                         else:
-                            turn_features.extend([0, 1, 0])
+                            # turn_features.extend([0, 1, 0])
+                            turn_features.extend([0.5])
                         # Add distance to leader for ego vehicle
-                        distance_to_closest = self.get_knn_observation(v)                    
-                        
+                        leader, dist_to_leader = v.leader()
+                        if leader is not None:
+                            distance_to_closest_features.extend([dist_to_leader])
+                        else:
+                            distance_to_closest_features.extend([1.0])
+                    
                     dist_features.extend([0 if j_pos == v.route_position else (j_pos - v.route_position) / max_dist for v in vehs])
                     speed_features.extend([v.speed / max_speed for v in vehs])
                 if c.chain_lr:
@@ -362,13 +370,13 @@ class GridEnv(Env):
                     closesest_threat_distance = abs(self.get_knn_observation(veh)[veh.id][7] * c.max_dist)                    
                     if closesest_threat_distance > c.max_dist:
                         closesest_threat_distance = c.max_dist
-                    if veh.speed < 1.0 and closesest_threat_distance > 2:
-                        in_reward -= 0.1
+                    # if veh.speed < 1.0 and closesest_threat_distance > 2:
+                    #     in_reward -= 0.1
                     # Add reward for high speed if the street is empty ahead
-                    if closesest_threat_distance > 10.0:
-                        in_reward += veh.speed / max_speed * 0.5
+                    # if closesest_threat_distance > 10.0:
+                    #     in_reward += veh.speed / max_speed * 0.5
                     # Always punish the agents in the grid to encourage faster clearing
-                    in_reward -= 0.1
+                    # in_reward -= 0.1
                 # Add the global reward portion for each RL vehicle
                 in_reward += len(ts.new_arrived) / len(prev_rls) if len(prev_rls) else 0 
                 reward[veh.id] = in_reward
@@ -635,6 +643,12 @@ class GridEnv(Env):
         # Sort KNN
         candiates.sort(key=lambda x: abs(x['features'][0]))  # Sort by absolute distance
         k_nearest = candiates[:10] # top 11 closest include ego
+        # Packet loss: drop neighbors with probability `obs_packet_loss`
+        p = c.get('obs_packet_loss', 0.0)
+        if p > 0:
+            if not hasattr(self, 'obs_rng'):
+                self.obs_rng = np.random.default_rng(c.get('obs_packet_loss_seed', None))
+            k_nearest = [x for x in k_nearest if self.obs_rng.random() >= p]
         obs_list = ego_features.copy()
         for item in k_nearest:
             obs_list.extend(item['features'])
