@@ -25,30 +25,10 @@ FLOW_PAIRS = [
 
 # Best checkpoints selected from the notebook charts/table
 BEST_CHECKPOINTS = {
-    # "fourway_1x1_penetration0.5_turn": 165,
-    # "fourway_1x1_penetration0.5_turn_adam": 165,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo": 170,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_26.11": 90,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_27.11": 200,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_01.12": 60,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_04.12": 165,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_05.12": 150,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_06.12": 160,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_08.12": 200,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_09.12": 50,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_10.12": 150,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_11.12": 120,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_12.12": 225,
-    # "fourway_1x1_penetration1_turn_adam_ppo_12.12": 200,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_14.12": 300,
-    # # "fourway_1x1_penetration0.333_turn_adam_ppo_15.12": 290,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_17.12": 120,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_transformer_02.02": 100,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_transformer_05.02": 250,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_transformer_07.02": 185,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_transformer_11.02": 35,
-    "fourway_1x1_penetration0.5_turn_adam_ppo_transformer_12.02": 85,
-    # "fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02": 1000,
+    # "fourway_1x1_penetration0.5_turn_adam_ppo_12.12": 220,
+    # "fourway_1x1_penetration0.5_turn_adam_ppo_17.12": 300,
+    # "fourway_1x1_penetration0.5_turn_adam_ppo_transformer_02.02": 65,
+    "fourway_1x1_penetration0.5_turn_adam_ppo_transformer_13.02": 350,
 }
 
 
@@ -114,8 +94,8 @@ def run_one_evaluation(exp_dir: Path, ckpt: int, flow_h: int, flow_v: int, dry_r
     # Ensure checkpoint exists for target flow rate
     if not dry_run:
         ensure_checkpoint_for_flow_rate(exp_dir, ckpt, flow_h, flow_v)
-
-    result_name = f"e{ckpt}_1x1_skip_500_flow{flow_h}x{flow_v}.csv"
+    loss = 5    
+    result_name = f"e{ckpt}_1x1_skip_500_loss{loss}_flow{flow_h}x{flow_v}.csv"
     result_save = exp_dir / "eval_results" / result_name
     vehicle_save = exp_dir / "vehicle_info" / result_name.replace(".csv", "_vehicle_info.csv")
     if "transformer" in exp_dir.name:
@@ -137,7 +117,9 @@ def run_one_evaluation(exp_dir: Path, ckpt: int, flow_h: int, flow_v: int, dry_r
         f"result_save={result_save.as_posix()}",
         f"vehicle_info_save={vehicle_save.as_posix()}",
         "use_ray=False",
+        "use_poisson=True",
         f"use_attention={use_attention}",
+        f"obs_packet_loss={loss/100 if loss > 0 else 0}",
     ]
 
     print("=" * 100)
